@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIGNAL — AI · AR · VR · Future Tech</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="gemini-code-1780050169181.css">
+<script src="gemini-code-1780050179860.js"></script>
+
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <a class="logo" href="#">
+        <div class="logo-mark">SIG</div>
+        <span class="logo-text">SIGNAL</span>
+      </a>
+      <div class="header-meta">
+        <span class="last-updated" id="lastUpdated">—</span>
+        <button class="refresh-btn" onclick="loadNews()">↻ REFRESH</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="ticker-wrap">
+    <span class="ticker-label">BREAKING FEED</span>
+    <div class="ticker-track" id="tickerTrack">
+      <span class="ticker-item">Awaiting hot tech updates…</span>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <div class="filter-tabs">
+      <button class="filter-tab active" data-cat="ALL" onclick="setFilter('ALL',this)">ALL</button>
+      <button class="filter-tab" data-cat="AI"   onclick="setFilter('AI',this)">🤖 AI</button>
+      <button class="filter-tab" data-cat="AR"   onclick="setFilter('AR',this)">👓 AR</button>
+      <button class="filter-tab" data-cat="VR"   onclick="setFilter('VR',this)">🥽 VR</button>
+      <button class="filter-tab" data-cat="Tech" onclick="setFilter('Tech',this)">⚡ TECH</button>
+    </div>
+    <div class="search-wrap">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.5">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input class="search-input" type="search" id="searchInput" placeholder="Search breaking stories…" oninput="renderGrid()">
+    </div>
+  </div>
+
+  <div class="stats-bar" id="statsBar"></div>
+
+  <div id="appContent">
+    <div class="spinner"></div>
+  </div>
+
+  <footer>
+    <div class="footer-inner">
+      <span class="footer-text">
+        SIGNAL — Serverless Front-end Engine &bull; Run fully on browser native JavaScript.
+      </span>
+      <span class="footer-text">
+        Sources: TechCrunch · The Verge · Wired · Ars Technica · CNET · Engadget · TechRadar · Gizmodo · ZDNET · Digital Trends
+      </span>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
