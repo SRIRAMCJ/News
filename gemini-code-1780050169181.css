@@ -28,8 +28,9 @@ html { scroll-behavior: smooth; }
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Inter', sans-serif;
-  font-size: 15px;
+  /* Globally set all standard body prose to Times New Roman */
+  font-family: 'Times New Roman', Times, Baskerville, Georgia, serif;
+  font-size: 16px; /* Slightly increased for better serif legibility */
   line-height: 1.6;
   min-height: 100vh;
   overflow-x: hidden;
@@ -74,14 +75,14 @@ header {
   background: var(--accent);
   border-radius: 6px;
   display: grid; place-items: center;
-  font-family: 'Space Mono', monospace;
-  font-size: 11px; font-weight: 700;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 12px; font-weight: 700;
   color: #fff;
 }
 
 .logo-text {
-  font-family: 'Syne', sans-serif;
-  font-size: 18px; font-weight: 800;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 20px; font-weight: 800;
   letter-spacing: 0.05em;
   color: var(--text);
 }
@@ -91,17 +92,18 @@ header {
 }
 
 .last-updated {
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 13px;
   color: var(--muted);
 }
 
 .refresh-btn {
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 12px;
+  font-weight: 700;
   padding: 6px 14px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
@@ -123,10 +125,10 @@ header {
 .ticker-label {
   flex-shrink: 0;
   padding: 0 16px;
-  font-family: 'Space Mono', monospace;
-  font-size: 10px;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.1em;
   color: var(--accent);
   border-right: 1px solid var(--border);
   height: 100%;
@@ -149,14 +151,14 @@ header {
 
 .ticker-item {
   padding: 0 32px;
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 13px;
   color: var(--muted);
   display: flex; align-items: center; gap: 8px;
 }
 .ticker-item::before {
-  content: '●';
-  font-size: 6px;
+  content: '•';
+  font-size: 10px;
   color: var(--accent);
 }
 
@@ -176,25 +178,24 @@ header {
 }
 
 .filter-tab {
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
-  padding: 7px 16px;
-  border-radius: 6px;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 13px;
+  padding: 6px 16px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--muted);
   cursor: pointer;
   transition: all 0.2s;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
   box-shadow: var(--shadow-sm);
 }
 .filter-tab:hover   { color: var(--text); border-color: rgba(0,0,0,0.2); }
 .filter-tab.active  { color: #fff; border-color: transparent; font-weight: 700; }
 
-/* Filter Tabs matching the active Rust focus block concept */
 .filter-tab[data-cat="ALL"].active  { background: var(--text); color: var(--bg); }
 .filter-tab[data-cat="AI"].active   { background: var(--ai); }
-.filter-tab[data-cat="AR"].active   { background: var(--accent); } /* Primary theme color matches AR UI block */
+.filter-tab[data-cat="AR"].active   { background: var(--accent); } 
 .filter-tab[data-cat="VR"].active   { background: var(--vr); }
 .filter-tab[data-cat="Tech"].active { background: var(--tech); }
 
@@ -209,17 +210,17 @@ header {
 .search-input {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 8px 14px 8px 36px;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 14px;
   color: var(--text);
   width: 220px;
   transition: all 0.2s;
   outline: none;
   box-shadow: var(--shadow-sm);
 }
-.search-input::placeholder { color: var(--muted); }
+.search-input::placeholder { color: var(--muted); font-style: italic; }
 .search-input:focus { border-color: var(--accent); background: #ffffff; }
 
 .stats-bar {
@@ -230,8 +231,8 @@ header {
 }
 .stat-pill {
   display: flex; align-items: center; gap: 8px;
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 13px;
   color: var(--muted);
 }
 .stat-dot {
@@ -251,7 +252,7 @@ header {
 
 .hero-card {
   position: relative;
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
   display: grid;
@@ -288,9 +289,9 @@ header {
 }
 
 .hero-title {
-  font-family: 'Syne', sans-serif;
-  font-size: clamp(22px, 3vw, 38px);
-  font-weight: 800;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: clamp(24px, 3.5vw, 42px);
+  font-weight: 700;
   line-height: 1.15;
   color: #fff;
   max-width: 760px;
@@ -298,8 +299,8 @@ header {
 }
 
 .hero-desc {
-  font-size: 15px;
-  color: rgba(255,255,255,0.8);
+  font-size: 16px;
+  color: rgba(255,255,255,0.85);
   max-width: 620px;
   line-height: 1.6;
   margin-bottom: 20px;
@@ -312,11 +313,11 @@ header {
 .read-btn {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 10px 20px;
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--accent);
   color: #fff;
-  font-family: 'Space Mono', monospace;
-  font-size: 12px;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 13px;
   text-decoration: none;
   transition: background 0.2s;
   font-weight: 700;
@@ -332,9 +333,10 @@ header {
 }
 
 .section-label {
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.15em;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   color: var(--muted);
   margin-bottom: 20px;
   display: flex; align-items: center; gap: 12px;
@@ -355,7 +357,7 @@ header {
 .news-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   overflow: hidden;
   cursor: pointer;
   display: flex;
@@ -400,12 +402,11 @@ header {
 
 .card-cat-badge {
   position: absolute; top: 12px; left: 12px;
-  font-family: 'Space Mono', monospace;
-  font-size: 10px;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 11px;
   padding: 4px 10px;
-  border-radius: 4px;
+  border-radius: 2px;
   font-weight: 700;
-  letter-spacing: 0.05em;
 }
 .card-cat-badge.AI   { background: var(--ai);   color: #fff; }
 .card-cat-badge.AR   { background: var(--accent); color: #fff; }
@@ -423,30 +424,31 @@ header {
 }
 
 .card-source {
-  font-family: 'Space Mono', monospace;
-  font-size: 10px;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 12px;
   color: var(--accent);
   font-weight: 700;
 }
 
 .card-date {
-  font-family: 'Space Mono', monospace;
-  font-size: 10px;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 12px;
   color: var(--muted);
+  font-style: italic;
 }
 
 .card-title {
-  font-family: 'Syne', sans-serif;
-  font-size: 16px;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 18px;
   font-weight: 700;
-  line-height: 1.4;
+  line-height: 1.35;
   color: var(--text);
   margin-bottom: 10px;
   flex: 1;
 }
 
 .card-desc {
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--muted);
   line-height: 1.6;
   display: -webkit-box;
@@ -458,8 +460,8 @@ header {
 
 .card-link {
   display: flex; align-items: center; gap: 6px;
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 12px;
   color: var(--muted);
   text-decoration: none;
   margin-top: auto;
@@ -473,8 +475,8 @@ header {
   padding: 80px 20px;
   text-align: center;
   color: var(--muted);
-  font-family: 'Space Mono', monospace;
-  font-size: 13px;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 14px;
 }
 .empty-state svg { opacity: 0.4; margin-bottom: 16px; }
 
@@ -486,16 +488,15 @@ header {
 }
 
 .load-more-btn {
-  font-family: 'Space Mono', monospace;
-  font-size: 12px;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 13px;
   padding: 12px 32px;
-  border-radius: 6px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
   transition: all 0.2s;
-  letter-spacing: 0.05em;
   box-shadow: var(--shadow-sm);
   font-weight: 700;
 }
@@ -519,15 +520,14 @@ footer {
 }
 
 .footer-text {
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 12px;
   color: var(--muted);
 }
 
 .footer-text a { color: var(--accent); text-decoration: none; }
 .footer-text a:hover { text-decoration: underline; }
 
-/* Subtle top-border accents for cards to mimic the clean grid system structure */
 .news-card[data-cat="AI"]:hover   { border-top: 2px solid var(--ai); }
 .news-card[data-cat="AR"]:hover   { border-top: 2px solid var(--accent); }
 .news-card[data-cat="VR"]:hover   { border-top: 2px solid var(--vr); }
@@ -546,10 +546,10 @@ footer {
 .error-box {
   padding: 32px;
   border: 1px solid rgba(193, 74, 47, 0.3);
-  border-radius: 8px;
+  border-radius: 6px;
   background: rgba(193, 74, 47, 0.05);
-  font-family: 'Space Mono', monospace;
-  font-size: 12px;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 13px;
   color: var(--accent);
   max-width: 600px;
   margin: 32px auto;
