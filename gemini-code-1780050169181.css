@@ -26,19 +26,19 @@
 
 /* ─── MIDNIGHT TERMINAL DARK MODE ─── */
 [data-theme="dark"] {
-  --bg:           #111110; /* Deep warm black */
-  --surface:      #1c1b19; /* Dark charcoal cards */
-  --surface2:     #242220; /* Slightly lighter for active tabs/hover */
-  --border:       rgba(255, 255, 255, 0.08); /* Subtle light border */
-  --text:         #e8e2d6; /* Warm off-white text */
-  --muted:        #9a9488; /* Lighter muted for readability */
-  --accent:       #e85d42; /* Brighter rust for dark backgrounds */
+  --bg:           #111110;
+  --surface:      #1c1b19;
+  --surface2:     #242220;
+  --border:       rgba(255, 255, 255, 0.08);
+  --text:         #e8e2d6;
+  --muted:        #9a9488;
+  --accent:       #e85d42;
   --accent2:      #c14a2f; 
 
-  --ai:           #5b87c7; /* Lighter blue */
-  --ar:           #e85d42; /* Lighter rust */
-  --vr:           #6a9b73; /* Lighter green */
-  --tech:         #9b72e1; /* Lighter purple */
+  --ai:           #5b87c7;
+  --ar:           #e85d42;
+  --vr:           #6a9b73;
+  --tech:         #9b72e1;
 
   --shadow-sm:    0 2px 8px rgba(0, 0, 0, 0.3);
   --shadow-md:    0 8px 24px rgba(0, 0, 0, 0.4);
@@ -150,7 +150,6 @@ header {
   border-color: var(--accent);
 }
 
-/* Show sun in dark mode, moon in light mode */
 .theme-toggle .icon-sun { display: none; }
 .theme-toggle .icon-moon { display: block; }
 
@@ -384,8 +383,6 @@ header {
   font-weight: 700;
 }
 .read-btn:hover { background: var(--accent2); }
-.read-btn svg { transition: transform 0.2s; }
-.read-btn:hover svg { transform: translateX(3px); }
 
 .grid-section {
   padding: 0 clamp(16px, 4vw, 64px) 48px;
@@ -454,12 +451,6 @@ header {
   display: block;
 }
 .news-card:hover .card-img { transform: scale(1.03); }
-
-.card-img-fallback {
-  width: 100%; height: 100%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 42px;
-}
 
 .card-cat-badge {
   position: absolute; top: 12px; left: 12px;
@@ -539,6 +530,22 @@ header {
   font-family: 'Times New Roman', Times, serif;
   font-size: 14px;
 }
+
+/* ─── Error & Status Boxes ─── */
+.error-box {
+  padding: 24px;
+  border: 1px solid rgba(193, 74, 47, 0.3);
+  border-radius: 6px;
+  background: rgba(193, 74, 47, 0.05);
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 14px;
+  color: var(--text);
+  max-width: 600px;
+  margin: 32px auto;
+  line-height: 1.7;
+  text-align: center;
+}
+.error-box strong { color: var(--accent); }
 
 .load-more-wrap {
   padding: 0 clamp(16px, 4vw, 64px) 64px;
