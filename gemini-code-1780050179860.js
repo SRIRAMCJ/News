@@ -59,6 +59,32 @@ function detectCategory(title, desc) {
   return "Tech";
 }
 
+/* Helper function to crawl target source page via a public CORS bypass wrapper */
+async function fetchBackupImageViaProxy(targetUrl) {
+  try {
+    // Using allorigins.win to completely bypass browser cross-origin policy limits
+    const corsProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+    const res = await fetch(corsProxy);
+    if (!res.ok) return "";
+    
+    const json = await res.json();
+    const htmlString = json.contents; // This holds the raw HTML string of the source page
+    
+    // Attempt to isolate meta og:image, twitter:image, or main article structural images
+    const ogMatch = htmlString.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+                    htmlString.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ||
+                    htmlString.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+                    
+    if (ogMatch && ogMatch[1]) {
+      return ogMatch[1];
+    }
+    return "";
+  } catch (e) {
+    console.warn("Source page image scrape failed: ", e);
+    return "";
+  }
+}
+
 /* ─────────────────────────────────────────
    CLIENT SIDE SCRAPER MODULE
 ───────────────────────────────────────── */
@@ -68,12 +94,11 @@ async function loadNews() {
   allArticles = [];
   
   const now = new Date();
-  // Rigid 24-hour timestamp delta check to ensure absolute hot-breaking validation
   const freshnessLimit = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
+  // Changed to map over loops carefully so we can handle localized async processing steps cleanly
   const fetchPromises = CHANNELS.map(async (channel) => {
     try {
-      // Maps requests over public RSS-to-JSON engine adapters to transparently solve browser CORS blocks
       const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(channel.url)}`;
       const response = await fetch(proxyUrl);
       if (!response.ok) return;
@@ -81,20 +106,20 @@ async function loadNews() {
       const data = await response.json();
       if (!data.items) return;
 
-      data.items.forEach(item => {
+      // Note: switching to a standard for...of loop here lets us cleanly utilize 'await' for the page scraper fallback
+      for (const item of data.items) {
         const title = (item.title || "").replace(/<[^>]+>/g, "").trim();
         const link = (item.link || "").trim();
         const desc = (item.description || "").replace(/<[^>]+>/g, "").trim();
         
-        if (!title || !link) return;
+        if (!title || !link) continue;
 
         const textTarget = `${title} ${desc}`.toLowerCase();
         const isRelevant = ALL_KEYWORDS.some(kw => textTarget.includes(kw));
-        if (!isRelevant) return;
+        if (!isRelevant) continue;
 
-        // Clean up text dates to safely evaluate timestamp milestones inside Safari, Chrome and Firefox
         const itemDate = item.pubDate ? new Date(item.pubDate.replace(/-/g, '/')) : new Date();
-        if (itemDate < freshnessLimit) return;
+        if (itemDate < freshnessLimit) continue;
 
         // ─── OPTIMIZED IMAGE EXTRACTION FALLBACK LAYER ───
         let image = "";
@@ -102,19 +127,22 @@ async function loadNews() {
         if (item.thumbnail) {
           image = item.thumbnail;
         } 
-        // 1. Check for standard RSS image enclosures inside the API parsed JSON
         else if (item.enclosure && item.enclosure.link && item.enclosure.type && item.enclosure.type.startsWith('image/')) {
           image = item.enclosure.link;
         }
-        // 2. Scan content payload blocks if present
         else if (item.content) {
           const match = item.content.match(/<img[^>]+src=["']([^"']+)["']/);
           if (match) image = match[1];
         }
-        // 3. Look directly into unstripped description strings for early embedded img objects (e.g. The Verge style)
         else if (item.description) {
           const match = item.description.match(/<img[^>]+src=["']([^"']+)["']/);
           if (match) image = match[1];
+        }
+
+        // 🌟 NEW DIRECT SOURCE SCRAPE FALLBACK 
+        // If image fields are still completely missing, scrape the underlying destination page
+        if (!image && link) {
+          image = await fetchBackupImageViaProxy(link);
         }
 
         allArticles.push({
@@ -127,7 +155,7 @@ async function loadNews() {
           category: detectCategory(title, desc) || channel.category,
           date: itemDate.toISOString()
         });
-      });
+      }
     } catch (err) {
       console.warn(`Could not sync channel ${channel.label}:`, err);
     }
@@ -135,10 +163,8 @@ async function loadNews() {
 
   await Promise.all(fetchPromises);
 
-  // Chronological sort allocation (Newest matching entries map to upper array boundaries)
   allArticles.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  // Clear cross-network syndication duplicate blocks cleanly
   const seenTitles = new Set();
   allArticles = allArticles.filter(art => {
     const cleanTitle = art.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 42);
