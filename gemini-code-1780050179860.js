@@ -7,7 +7,7 @@ let activeFilter = 'ALL';
 let visibleCount = 12;
 const PAGE_SIZE  = 12;
 
-// The 10 requested target tech channels + 6 fully free global news channels
+// The 10 requested target tech channels
 const CHANNELS = [
   { url: "https://techcrunch.com/feed/", category: "Tech", label: "TechCrunch" },
   { url: "https://www.theverge.com/rss/index.xml", category: "Tech", label: "The Verge" },
@@ -18,15 +18,7 @@ const CHANNELS = [
   { url: "https://www.techradar.com/rss", category: "Tech", label: "TechRadar" },
   { url: "https://gizmodo.com/rss", category: "Tech", label: "Gizmodo" },
   { url: "https://www.zdnet.com/news/rss.xml", category: "Tech", label: "ZDNET" },
-  { url: "https://www.digitaltrends.com/feed/", category: "Tech", label: "Digital Trends" },
-  
-  // ─── ADDED FREE MAIN STREAM GLOBAL NEWS CHANNELS ───
-  { url: "https://rss.nytimes.com/services/xml/rss/nyt/World.xml", category: "News", label: "NY Times World" },
-  { url: "https://feeds.bbci.co.uk/news/world/rss.xml", category: "News", label: "BBC News" },
-  { url: "https://www.aljazeera.com/xml/rss/all.xml", category: "News", label: "Al Jazeera" },
-  { url: "https://www.reutersagency.com/feed/?best-topics=political-general-news&post_type=best", category: "News", label: "Reuters" },
-  { url: "https://search.cnbc.com/rs/search/view.xml?partnerId=2000&keywords=world+news", category: "News", label: "CNBC World" },
-  { url: "https://hosted.ap.org/lineups/TOPHEADLINES.rss", category: "News", label: "Associated Press" }
+  { url: "https://www.digitaltrends.com/feed/", category: "Tech", label: "Digital Trends" }
 ];
 
 const KEYWORDS = {
@@ -37,9 +29,8 @@ const KEYWORDS = {
 };
 const ALL_KEYWORDS = Object.values(KEYWORDS).flat();
 
-// Updated configurations to include the general "News" badge assets
-const CAT_EMOJI = { AI:'🤖', AR:'👓', VR:'🥽', Tech:'⚡', News:'📰' };
-const CAT_FBG   = { AI:'#1e1d30', AR:'#0d2420', VR:'#2a1020', Tech:'#241d00', News:'#1a2130' };
+const CAT_EMOJI = { AI:'🤖', AR:'👓', VR:'🥽', Tech:'⚡' };
+const CAT_FBG   = { AI:'#1e1d30', AR:'#0d2420', VR:'#2a1020', Tech:'#241d00' };
 
 /* ─────────────────────────────────────────
    CHRONOLOGICAL RELATIVE TIME PARSERS
@@ -59,14 +50,13 @@ function escHtml(s='') {
           .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-function detectCategory(title, desc, defaultCat) {
-  // If it originally came from a general news feed, keep it classified as News unless it strongly hits a tech sub-category
+function detectCategory(title, desc) {
   const haystack = `${title} ${desc}`.toLowerCase();
   for (const [cat, keywords] of Object.entries(KEYWORDS)) {
     if (cat === "Tech") continue;
     if (keywords.some(kw => haystack.includes(kw))) return cat;
   }
-  return defaultCat;
+  return "Tech";
 }
 
 /* ─────────────────────────────────────────
@@ -78,10 +68,12 @@ async function loadNews() {
   allArticles = [];
   
   const now = new Date();
+  // Rigid 24-hour timestamp delta check to ensure absolute hot-breaking validation
   const freshnessLimit = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
   const fetchPromises = CHANNELS.map(async (channel) => {
     try {
+      // Maps requests over public RSS-to-JSON engine adapters to transparently solve browser CORS blocks
       const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(channel.url)}`;
       const response = await fetch(proxyUrl);
       if (!response.ok) return;
@@ -96,27 +88,30 @@ async function loadNews() {
         
         if (!title || !link) return;
 
-        // General News items bypass strict tech keyword verification so they don't get filtered out completely
-        if (channel.category !== "News") {
-          const textTarget = `${title} ${desc}`.toLowerCase();
-          const isRelevant = ALL_KEYWORDS.some(kw => textTarget.includes(kw));
-          if (!isRelevant) return;
-        }
+        const textTarget = `${title} ${desc}`.toLowerCase();
+        const isRelevant = ALL_KEYWORDS.some(kw => textTarget.includes(kw));
+        if (!isRelevant) return;
 
+        // Clean up text dates to safely evaluate timestamp milestones inside Safari, Chrome and Firefox
         const itemDate = item.pubDate ? new Date(item.pubDate.replace(/-/g, '/')) : new Date();
         if (itemDate < freshnessLimit) return;
 
+        // ─── OPTIMIZED IMAGE EXTRACTION FALLBACK LAYER ───
         let image = "";
+        
         if (item.thumbnail) {
           image = item.thumbnail;
         } 
+        // 1. Check for standard RSS image enclosures inside the API parsed JSON
         else if (item.enclosure && item.enclosure.link && item.enclosure.type && item.enclosure.type.startsWith('image/')) {
           image = item.enclosure.link;
         }
+        // 2. Scan content payload blocks if present
         else if (item.content) {
           const match = item.content.match(/<img[^>]+src=["']([^"']+)["']/);
           if (match) image = match[1];
         }
+        // 3. Look directly into unstripped description strings for early embedded img objects (e.g. The Verge style)
         else if (item.description) {
           const match = item.description.match(/<img[^>]+src=["']([^"']+)["']/);
           if (match) image = match[1];
@@ -129,7 +124,7 @@ async function loadNews() {
           link: link,
           image: image,
           source: channel.label,
-          category: detectCategory(title, desc, channel.category),
+          category: detectCategory(title, desc) || channel.category,
           date: itemDate.toISOString()
         });
       });
@@ -140,8 +135,10 @@ async function loadNews() {
 
   await Promise.all(fetchPromises);
 
+  // Chronological sort allocation (Newest matching entries map to upper array boundaries)
   allArticles.sort((a, b) => new Date(b.date) - new Date(a.date));
 
+  // Clear cross-network syndication duplicate blocks cleanly
   const seenTitles = new Set();
   allArticles = allArticles.filter(art => {
     const cleanTitle = art.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 42);
@@ -174,7 +171,7 @@ function buildTicker() {
 }
 
 function buildStats() {
-  const counts = { AI: 0, AR: 0, VR: 0, Tech: 0, News: 0 };
+  const counts = { AI: 0, AR: 0, VR: 0, Tech: 0 };
   allArticles.forEach(a => { if (counts[a.category] !== undefined) counts[a.category]++; });
   const sb = document.getElementById('statsBar');
   if (sb) {
@@ -218,6 +215,7 @@ function renderGrid() {
 
   let html = '';
 
+  /* Render Primary Hero Spot Feature card */
   if (hero) {
     const imgSrc = hero.image
       ? `<img class="hero-img" src="${escHtml(hero.image)}" alt="" onerror="this.style.display='none'">`
@@ -249,6 +247,7 @@ function renderGrid() {
       </div>`;
   }
 
+  /* Render Secondary Timeline cards column grids */
   html += `<div class="grid-section">`;
   if (hero) html += `<div class="section-label">LATEST STORIES</div>`;
   html += `<div class="news-grid" id="newsGrid">`;
@@ -294,6 +293,7 @@ function renderGrid() {
 
   html += `</div></div>`;
 
+  /* Render Infinite Scrolling pagination buttons triggers */
   html += `
     <div class="load-more-wrap">
       <button class="load-more-btn" id="loadMoreBtn" onclick="loadMore()" ${!hasMore ? 'disabled' : ''}>
@@ -317,5 +317,6 @@ function loadMore() {
 ───────────────────────────────────────── */
 loadNews();
 
+// Register automated client-side fetch processing lifecycle every 30 minutes cleanly
 const THIRTY_MINUTES = 30 * 60 * 1000;
 setInterval(loadNews, THIRTY_MINUTES);
