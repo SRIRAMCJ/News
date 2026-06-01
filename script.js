@@ -1,6 +1,28 @@
-/* ─────────────────────────────────────────
-   STATE & ARRAYS MAPPING DEFINITIONS
-───────────────────────────────────────── */
+/* ═══════════════════════════════════════════
+   DARK MODE — runs FIRST to prevent flash
+═══════════════════════════════════════════ */
+function initTheme() {
+  const saved = localStorage.getItem('signal-theme');
+  if (saved) {
+    document.documentElement.setAttribute('data-theme', saved);
+  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('signal-theme', next);
+}
+
+// Apply theme IMMEDIATELY — before any rendering
+initTheme();
+
+/* ═══════════════════════════════════════════
+   STATE & CONFIG
+═══════════════════════════════════════════ */
 let allArticles  = [];
 let filtered     = [];
 let activeFilter = 'ALL';
@@ -22,22 +44,18 @@ const CHANNELS = [
 ];
 
 const KEYWORDS = {
-  AI: ["artificial intelligence", "machine learning", "deep learning", "neural", "llm", "gpt", "gemini", "claude", "openai", "chatgpt", "generative ai", "transformer", "ai ", " ai,"],
-  AR: ["augmented reality", "ar glasses", "mixed reality", "spatial computing", "apple vision", "xr", "smart glasses", "hololens", "magic leap"],
-  VR: ["virtual reality", "vr headset", "meta quest", "oculus", "psvr", "immersive", "metaverse", " vr ", "vr "],
+  AI:  ["artificial intelligence", "machine learning", "deep learning", "neural", "llm", "gpt", "gemini", "claude", "openai", "chatgpt", "generative ai", "transformer", "ai ", " ai,"],
+  AR:  ["augmented reality", "ar glasses", "mixed reality", "spatial computing", "apple vision", "xr", "smart glasses", "hololens", "magic leap"],
+  VR:  ["virtual reality", "vr headset", "meta quest", "oculus", "psvr", "immersive", "metaverse", " vr ", "vr "],
   Tech: ["robotics", "quantum computing", "autonomous", "self-driving", "biotech", "nanotech", "iot", "innovation", "breakthrough", "chip", "processor", "semiconductor"]
 };
 const ALL_KEYWORDS = Object.values(KEYWORDS).flat();
 
 const CAT_EMOJI = { AI:'🤖', AR:'👓', VR:'🥽', Tech:'⚡' };
-const CAT_FBG   = { AI:'#1e1d30', AR:'#0d2420', VR:'#2a1020', Tech:'#241d00' };
 
-/* ─────────────────────────────────────────
-   GUARANTEED COVER IMAGE — DETERMINISTIC
-   Uses a hash of the title as the seed so
-   the same article always renders the
-   same photo. 100% coverage guaranteed.
-───────────────────────────────────────── */
+/* ═══════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════ */
 function generateFallbackImage(title) {
   let hash = 0;
   const str = title || 'fallback';
@@ -45,21 +63,17 @@ function generateFallbackImage(title) {
     hash = ((hash << 5) - hash) + str.charCodeAt(i);
     hash |= 0;
   }
-  const seed = Math.abs(hash).toString(36);
-  return `https://picsum.photos/seed/${seed}/640/360`;
+  return `https://picsum.photos/seed/${Math.abs(hash).toString(36)}/640/360`;
 }
 
-/* ─────────────────────────────────────────
-   UTILITY HELPERS
-───────────────────────────────────────── */
 function relativeTime(iso) {
-  const parsedDate = new Date(iso);
-  const secs = Math.floor((Date.now() - parsedDate) / 1000);
-  if (isNaN(secs)) return 'live';
-  if (secs < 60)    return 'just now';
-  if (secs < 3600)  return `${Math.floor(secs/60)}m ago`;
-  if (secs < 86400) return `${Math.floor(secs/3600)}h ago`;
-  return parsedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const d = new Date(iso);
+  const s = Math.floor((Date.now() - d) / 1000);
+  if (isNaN(s)) return 'live';
+  if (s < 60)    return 'just now';
+  if (s < 3600)  return `${Math.floor(s/60)}m ago`;
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
 }
 
 function escHtml(s='') {
@@ -68,10 +82,10 @@ function escHtml(s='') {
 }
 
 function detectCategory(title, desc) {
-  const haystack = `${title} ${desc}`.toLowerCase();
-  for (const [cat, keywords] of Object.entries(KEYWORDS)) {
+  const h = `${title} ${desc}`.toLowerCase();
+  for (const [cat, kws] of Object.entries(KEYWORDS)) {
     if (cat === "Tech") continue;
-    if (keywords.some(kw => haystack.includes(kw))) return cat;
+    if (kws.some(kw => h.includes(kw))) return cat;
   }
   return "Tech";
 }
@@ -88,12 +102,9 @@ function showSyncStatus(msg, isError) {
   el.style.color = isError ? 'var(--accent)' : 'var(--muted)';
 }
 
-/* ─────────────────────────────────────────
+/* ═══════════════════════════════════════════
    DUAL-SOURCE RSS FETCHER
-   Method 1: rss2json.com API
-   Method 2: Direct XML via corsproxy.io
-   Each channel is tried with both methods.
-───────────────────────────────────────── */
+═══════════════════════════════════════════ */
 async function fetchRssViaJson2(feedUrl) {
   const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`;
   const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
@@ -108,54 +119,35 @@ async function fetchRssViaCorsProxy(feedUrl) {
   const res = await fetch(corsUrl, { signal: AbortSignal.timeout(10000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const xmlText = await res.text();
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(xmlText, 'text/xml');
-
-  const errorNode = doc.querySelector('parsererror');
-  if (errorNode) throw new Error('XML parse error');
+  const doc = new DOMParser().parseFromString(xmlText, 'text/xml');
+  if (doc.querySelector('parsererror')) throw new Error('XML parse error');
 
   const items = [];
-  const entries = doc.querySelectorAll('item');
-  entries.forEach(entry => {
-    const get = (tag) => {
-      const el = entry.querySelector(tag);
-      return el ? el.textContent.trim() : '';
-    };
-    const getNS = (ns, tag) => {
-      const el = entry.getElementsByTagNameNS(ns, tag)[0];
-      return el ? el.textContent.trim() : '';
-    };
+  doc.querySelectorAll('item').forEach(entry => {
+    const get = (tag) => { const el = entry.querySelector(tag); return el ? el.textContent.trim() : ''; };
+    const getNS = (ns, tag) => { const el = entry.getElementsByTagNameNS(ns, tag)[0]; return el ? el.textContent.trim() : ''; };
 
     let image = '';
-    // media:thumbnail / media:content
-    const mThumbnail = entry.getElementsByTagNameNS('http://search.yahoo.com/mrss/', 'thumbnail')[0];
-    if (mThumbnail && mThumbnail.getAttribute('url')) image = mThumbnail.getAttribute('url');
+    const mThumb = entry.getElementsByTagNameNS('http://search.yahoo.com/mrss/', 'thumbnail')[0];
+    if (mThumb && mThumb.getAttribute('url')) image = mThumb.getAttribute('url');
     if (!image) {
-      const mContent = entry.getElementsByTagNameNS('http://search.yahoo.com/mrss/', 'content')[0];
-      if (mContent && mContent.getAttribute('url')) image = mContent.getAttribute('url');
+      const mCont = entry.getElementsByTagNameNS('http://search.yahoo.com/mrss/', 'content')[0];
+      if (mCont && mCont.getAttribute('url')) image = mCont.getAttribute('url');
     }
-    // enclosures
     if (!image) {
-      const enclosure = entry.querySelector('enclosure');
-      if (enclosure && enclosure.getAttribute('type') && enclosure.getAttribute('type').startsWith('image/')) {
-        image = enclosure.getAttribute('url');
-      }
+      const enc = entry.querySelector('enclosure');
+      if (enc && enc.getAttribute('type') && enc.getAttribute('type').startsWith('image/')) image = enc.getAttribute('url');
     }
-    // img inside content:encoded or description
     if (!image) {
-      const contentEncoded = get('content\\:encoded') || getNS('http://purl.org/rss/1.0/modules/content/', 'encoded') || '';
-      const descText = get('description') + ' ' + contentEncoded;
-      const imgMatch = descText.match(/<img[^>]+src=["']([^"']+)["']/i);
-      if (imgMatch) image = imgMatch[1];
+      const ce = get('content\\:encoded') || getNS('http://purl.org/rss/1.0/modules/content/', 'encoded') || '';
+      const dt = get('description') + ' ' + ce;
+      const m = dt.match(/<img[^>]+src=["']([^"']+)["']/i);
+      if (m) image = m[1];
     }
 
     items.push({
-      title: get('title'),
-      link: get('link'),
-      pubDate: get('pubDate'),
-      description: get('description'),
-      thumbnail: image,
-      content: '',
+      title: get('title'), link: get('link'), pubDate: get('pubDate'),
+      description: get('description'), thumbnail: image, content: '',
       enclosure: image ? { link: image, type: 'image/jpeg' } : null
     });
   });
@@ -164,91 +156,55 @@ async function fetchRssViaCorsProxy(feedUrl) {
   return items;
 }
 
-/* ─────────────────────────────────────────
-   IMAGE EXTRACTION FROM A SINGLE ITEM
-───────────────────────────────────────── */
 function extractImageFromItem(item, title) {
   let image = '';
-
-  // 1. thumbnail
   if (item.thumbnail) image = item.thumbnail;
-  // 2. enclosure
   if (!image && item.enclosure && item.enclosure.link) {
-    if (!item.enclosure.type || item.enclosure.type.startsWith('image/')) {
-      image = item.enclosure.link;
-    }
+    if (!item.enclosure.type || item.enclosure.type.startsWith('image/')) image = item.enclosure.link;
   }
-  // 3. <img> inside content
   if (!image && item.content) {
-    const match = item.content.match(/<img[^>]+src=["']([^"']+)["']/i);
-    if (match) image = match[1];
+    const m = item.content.match(/<img[^>]+src=["']([^"']+)["']/i);
+    if (m) image = m[1];
   }
-  // 4. <img> inside description
   if (!image && item.description) {
-    const match = item.description.match(/<img[^>]+src=["']([^"']+)["']/i);
-    if (match) image = match[1];
+    const m = item.description.match(/<img[^>]+src=["']([^"']+)["']/i);
+    if (m) image = m[1];
   }
-  // 5. GUARANTEED fallback — deterministic picsum
-  if (!image) {
-    image = generateFallbackImage(title);
-  }
-
-  // Normalize
+  if (!image) image = generateFallbackImage(title);
   if (image.startsWith('//')) image = 'https:' + image;
   if (image.startsWith('http://')) image = image.replace('http://', 'https://');
-
   return image;
 }
 
-/* ─────────────────────────────────────────
+/* ═══════════════════════════════════════════
    MAIN LOAD FUNCTION
-   Staggered fetching to avoid rate limits.
-   Dual-source per channel for resilience.
-───────────────────────────────────────── */
+═══════════════════════════════════════════ */
 async function loadNews() {
   if (isRefreshing) return;
   isRefreshing = true;
 
-  const contentTarget = document.getElementById('appContent');
-  if (contentTarget && !allArticles.length) {
-    contentTarget.innerHTML = '<div class="spinner"></div>';
-  }
+  const ct = document.getElementById('appContent');
+  if (ct && !allArticles.length) ct.innerHTML = '<div class="spinner"></div>';
 
   showSyncStatus('Syncing feeds…', false);
 
   const newArticles = [];
   const now = new Date();
-  // 48-hour window for broader coverage
   const freshnessLimit = new Date(now.getTime() - 48 * 60 * 60 * 1000);
-
-  let successCount = 0;
-  let failCount = 0;
+  let successCount = 0, failCount = 0;
 
   for (const channel of CHANNELS) {
     let items = null;
 
-    // Method 1: rss2json
-    try {
-      items = await fetchRssViaJson2(channel.url);
-      successCount++;
-    } catch (e) {
-      console.warn(`[Method 1 failed] ${channel.label}:`, e.message);
-    }
+    try { items = await fetchRssViaJson2(channel.url); successCount++; }
+    catch (e) { console.warn(`[Method 1 failed] ${channel.label}:`, e.message); }
 
-    // Method 2: CORS proxy + XML parse
     if (!items) {
-      try {
-        items = await fetchRssViaCorsProxy(channel.url);
-        successCount++;
-      } catch (e) {
-        console.warn(`[Method 2 failed] ${channel.label}:`, e.message);
-        failCount++;
-      }
+      try { items = await fetchRssViaCorsProxy(channel.url); successCount++; }
+      catch (e) { console.warn(`[Method 2 failed] ${channel.label}:`, e.message); failCount++; }
     }
 
     if (!items) continue;
-
-    // Small delay between channels to respect rate limits
     await new Promise(r => setTimeout(r, 300));
 
     for (const item of items) {
@@ -258,24 +214,18 @@ async function loadNews() {
 
       if (!title || !link) continue;
 
-      // Keyword relevance check
       const textTarget = `${title} ${desc}`.toLowerCase();
-      const isRelevant = ALL_KEYWORDS.some(kw => textTarget.includes(kw));
-      if (!isRelevant) continue;
+      if (!ALL_KEYWORDS.some(kw => textTarget.includes(kw))) continue;
 
-      // Freshness check
       const itemDate = item.pubDate ? new Date(item.pubDate) : new Date();
-      if (isNaN(itemDate.getTime())) continue;
-      if (itemDate < freshnessLimit) continue;
-
-      const image = extractImageFromItem(item, title);
+      if (isNaN(itemDate.getTime()) || itemDate < freshnessLimit) continue;
 
       newArticles.push({
         id: Math.random().toString(36).substring(2, 11),
         title,
         desc: desc.length > 185 ? desc.slice(0, 185) + '…' : desc,
         link,
-        image,
+        image: extractImageFromItem(item, title),
         source: channel.label,
         category: detectCategory(title, desc) || channel.category,
         date: itemDate.toISOString()
@@ -283,26 +233,18 @@ async function loadNews() {
     }
   }
 
-  // If we got zero articles, skip replacing (keep old data)
-  if (newArticles.length > 0) {
-    allArticles = newArticles;
-  }
+  if (newArticles.length > 0) allArticles = newArticles;
 
-  // Sort newest first
   allArticles.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  // Deduplicate by title similarity
-  const seenTitles = new Set();
-  allArticles = allArticles.filter(art => {
-    const key = art.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 42);
-    if (seenTitles.has(key)) return false;
-    seenTitles.add(key);
-    return true;
+  const seen = new Set();
+  allArticles = allArticles.filter(a => {
+    const k = a.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 42);
+    if (seen.has(k)) return false;
+    seen.add(k); return true;
   });
 
-  console.log(`[SIGNAL] Sync done: ${successCount} feeds OK, ${failCount} failed, ${allArticles.length} articles total`);
-
-  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
   if (allArticles.length > 0) {
     showSyncStatus(`✓ ${allArticles.length} stories — updated ${timeStr}`, false);
   } else {
@@ -315,9 +257,9 @@ async function loadNews() {
   isRefreshing = false;
 }
 
-/* ─────────────────────────────────────────
-   COMPONENTS RENDERING METHODS
-───────────────────────────────────────── */
+/* ═══════════════════════════════════════════
+   RENDERING
+═══════════════════════════════════════════ */
 function buildTicker() {
   const titles = allArticles.slice(0, 20).map(a =>
     `<span class="ticker-item">${CAT_EMOJI[a.category]||''} ${escHtml(a.title)}</span>`
@@ -327,15 +269,12 @@ function buildTicker() {
 }
 
 function buildStats() {
-  const counts = { AI: 0, AR: 0, VR: 0, Tech: 0 };
+  const counts = { AI:0, AR:0, VR:0, Tech:0 };
   allArticles.forEach(a => { if (counts[a.category] !== undefined) counts[a.category]++; });
   const sb = document.getElementById('statsBar');
   if (sb) {
     sb.innerHTML = Object.entries(counts).map(([cat, n]) =>
-      `<div class="stat-pill">
-         <span class="stat-dot ${cat.toLowerCase()}"></span>
-         <span class="stat-count">${n}</span> ${cat}
-       </div>`
+      `<div class="stat-pill"><span class="stat-dot ${cat.toLowerCase()}"></span><span class="stat-count">${n}</span> ${cat}</div>`
     ).join('');
   }
 }
@@ -349,73 +288,55 @@ function setFilter(cat, el) {
 }
 
 function getFiltered() {
-  const searchInput = document.getElementById('searchInput');
-  const q = (searchInput ? searchInput.value : '').toLowerCase();
+  const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
   return allArticles.filter(a => {
     const catOk = activeFilter === 'ALL' || a.category === activeFilter;
-    const searchOk = !q ||
-      a.title.toLowerCase().includes(q) ||
-      (a.desc||'').toLowerCase().includes(q) ||
-      (a.source||'').toLowerCase().includes(q);
+    const searchOk = !q || a.title.toLowerCase().includes(q) || (a.desc||'').toLowerCase().includes(q) || (a.source||'').toLowerCase().includes(q);
     return catOk && searchOk;
   });
 }
 
 function renderGrid() {
   filtered = getFiltered();
-  const hero    = filtered[0] || null;
-  const rest    = filtered.slice(1, visibleCount);
+  const hero = filtered[0] || null;
+  const rest = filtered.slice(1, visibleCount);
   const hasMore = filtered.length > visibleCount;
-
   let html = '';
 
-  /* ── Hero Card ── */
   if (hero) {
     const fb = escHtml(generateFallbackImage(hero.title));
     html += `
       <div class="hero-section">
         <div onclick="window.open('${escHtml(hero.link)}','_blank')" class="hero-card" data-cat="${escHtml(hero.category)}">
-          <img class="hero-img" src="${escHtml(hero.image)}" alt="" referrerpolicy="no-referrer"
-               onerror="this.onerror=null;this.src='${fb}'">
+          <img class="hero-img" src="${escHtml(hero.image)}" alt="" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${fb}'">
           <div class="hero-overlay"></div>
           <div class="hero-content">
             <div class="hero-meta">
               <span class="card-cat-badge ${escHtml(hero.category)}">${escHtml(hero.category)}</span>
-              <span style="font-size:12px;color:rgba(255,255,255,0.7)">
-                ${escHtml(hero.source)} · ${relativeTime(hero.date)}
-              </span>
+              <span style="font-size:12px;color:rgba(255,255,255,0.7)">${escHtml(hero.source)} · ${relativeTime(hero.date)}</span>
             </div>
             <h1 class="hero-title">${escHtml(hero.title)}</h1>
             <p class="hero-desc">${escHtml(hero.desc)}</p>
-            <div class="hero-footer">
-              <span class="read-btn">READ BREAKING ALERTS →</span>
-            </div>
+            <div class="hero-footer"><span class="read-btn">READ BREAKING ALERTS →</span></div>
           </div>
         </div>
       </div>`;
   }
 
-  /* ── Grid Section ── */
   html += `<div class="grid-section">`;
   if (hero) html += `<div class="section-label">LATEST STORIES</div>`;
   html += `<div class="news-grid" id="newsGrid">`;
 
   if (!filtered.length) {
-    html += `
-      <div class="empty-state">
-        <div>No breaking stories found matching filters</div>
-      </div>`;
+    html += `<div class="empty-state"><div>No breaking stories found matching filters</div></div>`;
   } else {
     rest.forEach((a, i) => {
       const delay = `animation-delay:${Math.min(i*40,400)}ms`;
       const fb = escHtml(generateFallbackImage(a.title));
-      const hostname = safeHostname(a.link);
-
       html += `
         <a href="${escHtml(a.link)}" target="_blank" rel="noopener" class="news-card" data-cat="${escHtml(a.category)}" style="${delay}">
           <div class="card-thumb">
-            <img class="card-img" src="${escHtml(a.image)}" alt="" loading="lazy" referrerpolicy="no-referrer"
-                 onerror="this.onerror=null;this.src='${fb}'">
+            <img class="card-img" src="${escHtml(a.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${fb}'">
             <span class="card-cat-badge ${escHtml(a.category)}">${escHtml(a.category)}</span>
           </div>
           <div class="card-body">
@@ -425,24 +346,21 @@ function renderGrid() {
             </div>
             <h2 class="card-title">${escHtml(a.title)}</h2>
             <p class="card-desc">${escHtml(a.desc)}</p>
-            <span class="card-link">${escHtml(hostname)}</span>
+            <span class="card-link">${escHtml(safeHostname(a.link))}</span>
           </div>
         </a>`;
     });
   }
 
   html += `</div></div>`;
+  html += `<div class="load-more-wrap">
+    <button class="load-more-btn" id="loadMoreBtn" onclick="loadMore()" ${!hasMore ? 'disabled' : ''}>
+      ${hasMore ? `LOAD MORE (${filtered.length - visibleCount} remaining)` : 'ALL CAUGHT UP'}
+    </button>
+  </div>`;
 
-  /* ── Load More ── */
-  html += `
-    <div class="load-more-wrap">
-      <button class="load-more-btn" id="loadMoreBtn" onclick="loadMore()" ${!hasMore ? 'disabled' : ''}>
-        ${hasMore ? `LOAD MORE (${filtered.length - visibleCount} remaining)` : 'ALL CAUGHT UP'}
-      </button>
-    </div>`;
-
-  const viewContainer = document.getElementById('appContent');
-  if (viewContainer) viewContainer.innerHTML = html;
+  const el = document.getElementById('appContent');
+  if (el) el.innerHTML = html;
 }
 
 function loadMore() {
@@ -450,11 +368,8 @@ function loadMore() {
   renderGrid();
 }
 
-/* ─────────────────────────────────────────
-   BOOTSTRAP + 30-MIN AUTO-REFRESH
-───────────────────────────────────────── */
+/* ═══════════════════════════════════════════
+   BOOTSTRAP
+═══════════════════════════════════════════ */
 loadNews();
-setInterval(() => {
-  console.log('[SIGNAL] 30-min auto-refresh triggered');
-  loadNews();
-}, 30 * 60 * 1000);
+setInterval(() => { loadNews(); }, 30 * 60 * 1000);
