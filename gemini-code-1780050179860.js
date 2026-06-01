@@ -59,11 +59,10 @@ function detectCategory(title, desc) {
 }
 
 /* ─────────────────────────────────────────
-   AUTOMATED IMAGE ADDRESS EXTRACTOR
+   AUTOMATED IMAGE ADDRESS EXTRACTOR (CORS)
 ───────────────────────────────────────── */
 async function fetchBackupImageViaProxy(targetUrl) {
   try {
-    // Fetches the raw HTML via a CORS proxy to extract hidden cover imagery
     const corsProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
     const res = await fetch(corsProxy);
     if (!res.ok) return "";
@@ -71,7 +70,6 @@ async function fetchBackupImageViaProxy(targetUrl) {
     const json = await res.json();
     const htmlString = json.contents;
     
-    // Scans metadata configurations for original high-res cover image addresses
     const titlePatterns = [
       /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
       /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
@@ -89,7 +87,6 @@ async function fetchBackupImageViaProxy(targetUrl) {
       }
     }
 
-    // Direct image HTML layout query fallback
     const structuralMatch = htmlString.match(/<article[^>]*>[\s\S]*?<img[^>]+(?:data-src|src)=["']([^"']+)["']/i) ||
                             htmlString.match(/<img[^>]+class=["'][^"']*featured[^"']*["'][^>]+(?:data-src|src)=["']([^"']+)["']/i);
                                
@@ -126,7 +123,6 @@ async function loadNews() {
       const data = await response.json();
       if (!data.items) return;
 
-      // Processing items loops cleanly via for...of to allow background image resolution processing
       for (const item of data.items) {
         const title = (item.title || "").replace(/<[^>]+>/g, "").trim();
         const link = (item.link || "").trim();
@@ -141,7 +137,6 @@ async function loadNews() {
         const itemDate = item.pubDate ? new Date(item.pubDate.replace(/-/g, '/')) : new Date();
         if (itemDate < freshnessLimit) continue;
 
-        // Extract native images if provided
         let image = "";
         if (item.thumbnail) {
           image = item.thumbnail;
@@ -158,7 +153,7 @@ async function loadNews() {
           if (match) image = match[1];
         }
 
-        // Automatic Copy-Paste: Fallback directly to source HTML page imagery if empty
+        // Automated Copy-Paste Fallback from page source content image headers
         if (!image && link) {
           image = await fetchBackupImageViaProxy(link);
         }
@@ -257,10 +252,10 @@ function renderGrid() {
 
   let html = '';
 
-  /* Primary Hero Card Injection */
+  /* Primary Hero Card Injection (Fixed with no-referrer setup) */
   if (hero) {
     const imgSrc = hero.image
-      ? `<img class="hero-img" src="${escHtml(hero.image)}" alt="" onerror="this.style.display='none'">`
+      ? `<img class="hero-img" src="${escHtml(hero.image)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'">`
       : '';
     html += `
       <div class="hero-section">
@@ -286,7 +281,7 @@ function renderGrid() {
       </div>`;
   }
 
-  /* Grid Items Injection */
+  /* Grid Items Injection (Fixed with no-referrer setup) */
   html += `<div class="grid-section">`;
   if (hero) html += `<div class="section-label">LATEST STORIES</div>`;
   html += `<div class="news-grid" id="newsGrid">`;
@@ -300,7 +295,7 @@ function renderGrid() {
     rest.forEach((a, i) => {
       const delay = `animation-delay:${Math.min(i*40,400)}ms`;
       const img = a.image
-        ? `<img class="card-img" src="${escHtml(a.image)}" alt="" loading="lazy"
+        ? `<img class="card-img" src="${escHtml(a.image)}" alt="" loading="lazy" referrerpolicy="no-referrer"
                onerror="this.parentElement.innerHTML='<div class=\\'card-img-fallback\\' style=\\'background:${CAT_FBG[a.category]||'#111'}\\'>${CAT_EMOJI[a.category]||'📰'}</div>'">`
         : `<div class="card-img-fallback" style="background:${CAT_FBG[a.category]||'#111'}">${CAT_EMOJI[a.category]||'📰'}</div>`;
 
