@@ -18,7 +18,6 @@ function toggleTheme() {
   localStorage.setItem('signal-theme', newTheme);
 }
 
-// Apply theme immediately before DOM renders to prevent flash
 initTheme();
 
 /* ─────────────────────────────────────────
@@ -53,7 +52,6 @@ const KEYWORDS = {
 const ALL_KEYWORDS = Object.values(KEYWORDS).flat();
 
 const CAT_EMOJI = { AI:'🤖', AR:'👓', VR:'🥽', Tech:'⚡' };
-const CAT_FBG   = { AI:'#1e1d30', AR:'#0d2420', VR:'#2a1020', Tech:'#241d00' };
 
 function generateFallbackImage(title) {
   let hash = 0;
@@ -102,6 +100,9 @@ function showSyncStatus(msg, isError) {
   el.style.color = isError ? 'var(--accent)' : 'var(--muted)';
 }
 
+/* ─────────────────────────────────────────
+   DUAL-SOURCE RSS FETCHER
+───────────────────────────────────────── */
 async function fetchRssViaJson2(feedUrl) {
   const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`;
   const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
@@ -193,6 +194,32 @@ function extractImageFromItem(item, title) {
   return image;
 }
 
+/* ─────────────────────────────────────────
+   MOCK DATA FALLBACK
+   If APIs fail completely, inject mock data
+   so the UI renders correctly.
+───────────────────────────────────────── */
+function getMockArticles() {
+  const now = new Date();
+  return [
+    { title: "OpenAI Announces GPT-5 with Real-Time Reasoning", desc: "The next generation of large language models promises to bridge the gap between artificial intelligence and human cognition.", source: "TechCrunch", category: "AI", date: new Date(now - 3600000).toISOString(), link: "#" },
+    { title: "Apple Vision Pro 2 Leaks Reveal Lighter Design", desc: "Apple's second iteration of its spatial computing headset aims to address the weight and comfort issues of the original.", source: "The Verge", category: "AR", date: new Date(now - 7200000).toISOString(), link: "#" },
+    { title: "Meta Quest 4 Sets New Standard for VR Affordability", desc: "Meta's latest headset brings high-end mixed reality features down to a consumer-friendly price point.", source: "Wired", category: "VR", date: new Date(now - 10800000).toISOString(), link: "#" },
+    { title: "Quantum Computing Breakthrough: 1000 Qubit Processor", desc: "IBM unveils its latest quantum processor, crossing the critical threshold needed for practical quantum advantage.", source: "Ars Technica", category: "Tech", date: new Date(now - 14400000).toISOString(), link: "#" },
+    { title: "Google DeepMind Achieves AGI Benchmark in Closed Test", desc: "Internal sources report that DeepMind's newest model has passed a comprehensive general intelligence test.", source: "Engadget", category: "AI", date: new Date(now - 18000000).toISOString(), link: "#" },
+    { title: "Magic Leap 3 Enters Enterprise AR Market", desc: "Magic Leap pivots entirely to B2B, offering augmented reality solutions for medical and engineering sectors.", source: "CNET", category: "AR", date: new Date(now - 21600000).toISOString(), link: "#" },
+    { title: "PlayStation VR2 PC Adapter Announced", desc: "Sony finally allows its VR headset to connect to gaming PCs, unlocking a massive library of SteamVR titles.", source: "TechRadar", category: "VR", date: new Date(now - 25200000).toISOString(), link: "#" },
+    { title: "Neuralink Begins Human Trials for Telepathic Interface", desc: "The first human patients are able to control computer cursors using only their thoughts via the N1 implant.", source: "Gizmodo", category: "Tech", date: new Date(now - 28800000).toISOString(), link: "#" },
+  ].map((m, i) => ({
+    id: `mock-${i}`,
+    image: generateFallbackImage(m.title),
+    ...m
+  }));
+}
+
+/* ─────────────────────────────────────────
+   MAIN LOAD FUNCTION
+───────────────────────────────────────── */
 async function loadNews() {
   if (isRefreshing) return;
   isRefreshing = true;
@@ -265,8 +292,17 @@ async function loadNews() {
     }
   }
 
-  if (newArticles.length > 0) {
+  // If APIs fail completely, use mock data so UI isn't blank
+  if (newArticles.length === 0 && allArticles.length === 0) {
+    allArticles = getMockArticles();
+    showSyncStatus('⚠ Live feeds unavailable — showing demo data', true);
+  } else if (newArticles.length > 0) {
     allArticles = newArticles;
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    showSyncStatus(`✓ ${allArticles.length} stories — updated ${timeStr}`, false);
+  } else {
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    showSyncStatus(`⚠ Feed sync failed — last checked ${timeStr}`, true);
   }
 
   allArticles.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -278,13 +314,6 @@ async function loadNews() {
     seenTitles.add(key);
     return true;
   });
-
-  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  if (allArticles.length > 0) {
-    showSyncStatus(`✓ ${allArticles.length} stories — updated ${timeStr}`, false);
-  } else {
-    showSyncStatus(`⚠ No stories found — last checked ${timeStr}`, true);
-  }
 
   buildTicker();
   buildStats();
@@ -421,7 +450,21 @@ function loadMore() {
   renderGrid();
 }
 
-loadNews();
+/* ─────────────────────────────────────────
+   BOOTSTRAP, THEME TOGGLE WIRING & AUTO-REFRESH
+───────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  // Wire up the Dark Mode toggle button now that DOM is ready
+  const toggleBtn = document.getElementById('themeToggle');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', toggleTheme);
+  }
+  
+  // Initial load
+  loadNews();
+});
+
+// 30-min auto-refresh
 setInterval(() => {
   loadNews();
 }, 30 * 60 * 1000);
