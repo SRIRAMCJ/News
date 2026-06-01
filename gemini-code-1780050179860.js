@@ -1,4 +1,27 @@
 /* ─────────────────────────────────────────
+   DARK MODE INITIALIZATION & TOGGLE
+───────────────────────────────────────── */
+function initTheme() {
+  const savedTheme = localStorage.getItem('signal-theme');
+  if (savedTheme) {
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+}
+
+function toggleTheme() {
+  let currentTheme = document.documentElement.getAttribute('data-theme');
+  let newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  
+  document.documentElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem('signal-theme', newTheme);
+}
+
+// Apply theme immediately before DOM renders to prevent flash
+initTheme();
+
+/* ─────────────────────────────────────────
    STATE & ARRAYS MAPPING DEFINITIONS
 ───────────────────────────────────────── */
 let allArticles  = [];
@@ -32,12 +55,6 @@ const ALL_KEYWORDS = Object.values(KEYWORDS).flat();
 const CAT_EMOJI = { AI:'🤖', AR:'👓', VR:'🥽', Tech:'⚡' };
 const CAT_FBG   = { AI:'#1e1d30', AR:'#0d2420', VR:'#2a1020', Tech:'#241d00' };
 
-/* ─────────────────────────────────────────
-   GUARANTEED COVER IMAGE — DETERMINISTIC
-   Uses a hash of the title as the seed so
-   the same article always renders the
-   same photo. 100% coverage guaranteed.
-───────────────────────────────────────── */
 function generateFallbackImage(title) {
   let hash = 0;
   const str = title || 'fallback';
@@ -49,9 +66,6 @@ function generateFallbackImage(title) {
   return `https://picsum.photos/seed/${seed}/640/360`;
 }
 
-/* ─────────────────────────────────────────
-   UTILITY HELPERS
-───────────────────────────────────────── */
 function relativeTime(iso) {
   const parsedDate = new Date(iso);
   const secs = Math.floor((Date.now() - parsedDate) / 1000);
@@ -88,12 +102,6 @@ function showSyncStatus(msg, isError) {
   el.style.color = isError ? 'var(--accent)' : 'var(--muted)';
 }
 
-/* ─────────────────────────────────────────
-   DUAL-SOURCE RSS FETCHER
-   Method 1: rss2json.com API
-   Method 2: Direct XML via corsproxy.io
-   Each channel is tried with both methods.
-───────────────────────────────────────── */
 async function fetchRssViaJson2(feedUrl) {
   const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`;
   const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
@@ -127,21 +135,18 @@ async function fetchRssViaCorsProxy(feedUrl) {
     };
 
     let image = '';
-    // media:thumbnail / media:content
     const mThumbnail = entry.getElementsByTagNameNS('http://search.yahoo.com/mrss/', 'thumbnail')[0];
     if (mThumbnail && mThumbnail.getAttribute('url')) image = mThumbnail.getAttribute('url');
     if (!image) {
       const mContent = entry.getElementsByTagNameNS('http://search.yahoo.com/mrss/', 'content')[0];
       if (mContent && mContent.getAttribute('url')) image = mContent.getAttribute('url');
     }
-    // enclosures
     if (!image) {
       const enclosure = entry.querySelector('enclosure');
       if (enclosure && enclosure.getAttribute('type') && enclosure.getAttribute('type').startsWith('image/')) {
         image = enclosure.getAttribute('url');
       }
     }
-    // img inside content:encoded or description
     if (!image) {
       const contentEncoded = get('content\\:encoded') || getNS('http://purl.org/rss/1.0/modules/content/', 'encoded') || '';
       const descText = get('description') + ' ' + contentEncoded;
@@ -164,47 +169,30 @@ async function fetchRssViaCorsProxy(feedUrl) {
   return items;
 }
 
-/* ─────────────────────────────────────────
-   IMAGE EXTRACTION FROM A SINGLE ITEM
-───────────────────────────────────────── */
 function extractImageFromItem(item, title) {
   let image = '';
-
-  // 1. thumbnail
   if (item.thumbnail) image = item.thumbnail;
-  // 2. enclosure
   if (!image && item.enclosure && item.enclosure.link) {
     if (!item.enclosure.type || item.enclosure.type.startsWith('image/')) {
       image = item.enclosure.link;
     }
   }
-  // 3. <img> inside content
   if (!image && item.content) {
     const match = item.content.match(/<img[^>]+src=["']([^"']+)["']/i);
     if (match) image = match[1];
   }
-  // 4. <img> inside description
   if (!image && item.description) {
     const match = item.description.match(/<img[^>]+src=["']([^"']+)["']/i);
     if (match) image = match[1];
   }
-  // 5. GUARANTEED fallback — deterministic picsum
   if (!image) {
     image = generateFallbackImage(title);
   }
-
-  // Normalize
   if (image.startsWith('//')) image = 'https:' + image;
   if (image.startsWith('http://')) image = image.replace('http://', 'https://');
-
   return image;
 }
 
-/* ─────────────────────────────────────────
-   MAIN LOAD FUNCTION
-   Staggered fetching to avoid rate limits.
-   Dual-source per channel for resilience.
-───────────────────────────────────────── */
 async function loadNews() {
   if (isRefreshing) return;
   isRefreshing = true;
@@ -218,7 +206,6 @@ async function loadNews() {
 
   const newArticles = [];
   const now = new Date();
-  // 48-hour window for broader coverage
   const freshnessLimit = new Date(now.getTime() - 48 * 60 * 60 * 1000);
 
   let successCount = 0;
@@ -227,7 +214,6 @@ async function loadNews() {
   for (const channel of CHANNELS) {
     let items = null;
 
-    // Method 1: rss2json
     try {
       items = await fetchRssViaJson2(channel.url);
       successCount++;
@@ -235,7 +221,6 @@ async function loadNews() {
       console.warn(`[Method 1 failed] ${channel.label}:`, e.message);
     }
 
-    // Method 2: CORS proxy + XML parse
     if (!items) {
       try {
         items = await fetchRssViaCorsProxy(channel.url);
@@ -248,7 +233,6 @@ async function loadNews() {
 
     if (!items) continue;
 
-    // Small delay between channels to respect rate limits
     await new Promise(r => setTimeout(r, 300));
 
     for (const item of items) {
@@ -258,12 +242,10 @@ async function loadNews() {
 
       if (!title || !link) continue;
 
-      // Keyword relevance check
       const textTarget = `${title} ${desc}`.toLowerCase();
       const isRelevant = ALL_KEYWORDS.some(kw => textTarget.includes(kw));
       if (!isRelevant) continue;
 
-      // Freshness check
       const itemDate = item.pubDate ? new Date(item.pubDate) : new Date();
       if (isNaN(itemDate.getTime())) continue;
       if (itemDate < freshnessLimit) continue;
@@ -283,15 +265,12 @@ async function loadNews() {
     }
   }
 
-  // If we got zero articles, skip replacing (keep old data)
   if (newArticles.length > 0) {
     allArticles = newArticles;
   }
 
-  // Sort newest first
   allArticles.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  // Deduplicate by title similarity
   const seenTitles = new Set();
   allArticles = allArticles.filter(art => {
     const key = art.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 42);
@@ -299,8 +278,6 @@ async function loadNews() {
     seenTitles.add(key);
     return true;
   });
-
-  console.log(`[SIGNAL] Sync done: ${successCount} feeds OK, ${failCount} failed, ${allArticles.length} articles total`);
 
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   if (allArticles.length > 0) {
@@ -315,9 +292,6 @@ async function loadNews() {
   isRefreshing = false;
 }
 
-/* ─────────────────────────────────────────
-   COMPONENTS RENDERING METHODS
-───────────────────────────────────────── */
 function buildTicker() {
   const titles = allArticles.slice(0, 20).map(a =>
     `<span class="ticker-item">${CAT_EMOJI[a.category]||''} ${escHtml(a.title)}</span>`
@@ -369,7 +343,6 @@ function renderGrid() {
 
   let html = '';
 
-  /* ── Hero Card ── */
   if (hero) {
     const fb = escHtml(generateFallbackImage(hero.title));
     html += `
@@ -395,7 +368,6 @@ function renderGrid() {
       </div>`;
   }
 
-  /* ── Grid Section ── */
   html += `<div class="grid-section">`;
   if (hero) html += `<div class="section-label">LATEST STORIES</div>`;
   html += `<div class="news-grid" id="newsGrid">`;
@@ -433,7 +405,6 @@ function renderGrid() {
 
   html += `</div></div>`;
 
-  /* ── Load More ── */
   html += `
     <div class="load-more-wrap">
       <button class="load-more-btn" id="loadMoreBtn" onclick="loadMore()" ${!hasMore ? 'disabled' : ''}>
@@ -450,11 +421,7 @@ function loadMore() {
   renderGrid();
 }
 
-/* ─────────────────────────────────────────
-   BOOTSTRAP + 30-MIN AUTO-REFRESH
-───────────────────────────────────────── */
 loadNews();
 setInterval(() => {
-  console.log('[SIGNAL] 30-min auto-refresh triggered');
   loadNews();
 }, 30 * 60 * 1000);
