@@ -7,7 +7,6 @@ let activeFilter = 'ALL';
 let visibleCount = 12;
 const PAGE_SIZE  = 12;
 
-// The 10 requested target tech channels
 const CHANNELS = [
   { url: "https://techcrunch.com/feed/", category: "Tech", label: "TechCrunch" },
   { url: "https://www.theverge.com/rss/index.xml", category: "Tech", label: "The Verge" },
@@ -59,44 +58,65 @@ function detectCategory(title, desc) {
   return "Tech";
 }
 
-/* Helper function to crawl target source page via a public CORS bypass wrapper */
+/* ─────────────────────────────────────────
+   AUTOMATED IMAGE ADDRESS EXTRACTOR
+───────────────────────────────────────── */
 async function fetchBackupImageViaProxy(targetUrl) {
   try {
-    // Using allorigins.win to completely bypass browser cross-origin policy limits
+    // Fetches the raw HTML via a CORS proxy to extract hidden cover imagery
     const corsProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
     const res = await fetch(corsProxy);
     if (!res.ok) return "";
     
     const json = await res.json();
-    const htmlString = json.contents; // This holds the raw HTML string of the source page
+    const htmlString = json.contents;
     
-    // Attempt to isolate meta og:image, twitter:image, or main article structural images
-    const ogMatch = htmlString.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
-                    htmlString.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ||
-                    htmlString.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
-                    
-    if (ogMatch && ogMatch[1]) {
-      return ogMatch[1];
+    // Scans metadata configurations for original high-res cover image addresses
+    const titlePatterns = [
+      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+      /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
+      /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i
+    ];
+
+    for (let pattern of titlePatterns) {
+      const match = htmlString.match(pattern);
+      if (match && match[1]) {
+        let imgUrl = match[1];
+        if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
+        if (imgUrl.startsWith('http://')) imgUrl = imgUrl.replace('http://', 'https://');
+        return imgUrl;
+      }
     }
+
+    // Direct image HTML layout query fallback
+    const structuralMatch = htmlString.match(/<article[^>]*>[\s\S]*?<img[^>]+(?:data-src|src)=["']([^"']+)["']/i) ||
+                            htmlString.match(/<img[^>]+class=["'][^"']*featured[^"']*["'][^>]+(?:data-src|src)=["']([^"']+)["']/i);
+                               
+    if (structuralMatch && structuralMatch[1]) {
+      let imgUrl = structuralMatch[1];
+      if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
+      return imgUrl;
+    }
+
     return "";
   } catch (e) {
-    console.warn("Source page image scrape failed: ", e);
+    console.warn("Direct scraping fallback caught exception:", e);
     return "";
   }
 }
 
 /* ─────────────────────────────────────────
-   CLIENT SIDE SCRAPER MODULE
+   CLIENT SIDE SCRAPER MODULE WITH REFRESH LOGIC
 ───────────────────────────────────────── */
 async function loadNews() {
   const contentTarget = document.getElementById('appContent');
-  if (contentTarget) contentTarget.innerHTML = '<div class="spinner"></div>';
+  if (contentTarget && allArticles.length === 0) contentTarget.innerHTML = '<div class="spinner"></div>';
   allArticles = [];
   
   const now = new Date();
   const freshnessLimit = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  // Changed to map over loops carefully so we can handle localized async processing steps cleanly
   const fetchPromises = CHANNELS.map(async (channel) => {
     try {
       const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(channel.url)}`;
@@ -106,7 +126,7 @@ async function loadNews() {
       const data = await response.json();
       if (!data.items) return;
 
-      // Note: switching to a standard for...of loop here lets us cleanly utilize 'await' for the page scraper fallback
+      // Processing items loops cleanly via for...of to allow background image resolution processing
       for (const item of data.items) {
         const title = (item.title || "").replace(/<[^>]+>/g, "").trim();
         const link = (item.link || "").trim();
@@ -121,9 +141,8 @@ async function loadNews() {
         const itemDate = item.pubDate ? new Date(item.pubDate.replace(/-/g, '/')) : new Date();
         if (itemDate < freshnessLimit) continue;
 
-        // ─── OPTIMIZED IMAGE EXTRACTION FALLBACK LAYER ───
+        // Extract native images if provided
         let image = "";
-        
         if (item.thumbnail) {
           image = item.thumbnail;
         } 
@@ -139,8 +158,7 @@ async function loadNews() {
           if (match) image = match[1];
         }
 
-        // 🌟 NEW DIRECT SOURCE SCRAPE FALLBACK 
-        // If image fields are still completely missing, scrape the underlying destination page
+        // Automatic Copy-Paste: Fallback directly to source HTML page imagery if empty
         if (!image && link) {
           image = await fetchBackupImageViaProxy(link);
         }
@@ -175,8 +193,8 @@ async function loadNews() {
 
   const updateLabel = document.getElementById('lastUpdated');
   if (updateLabel) {
-    updateLabel.textContent = 'Sync Complete ' + now.toLocaleDateString('en-US', { 
-      month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' 
+    updateLabel.textContent = 'Sync Complete — ' + now.toLocaleTimeString('en-US', { 
+      hour: '2-digit', minute: '2-digit' 
     });
   }
 
@@ -186,7 +204,7 @@ async function loadNews() {
 }
 
 /* ─────────────────────────────────────────
-   TICKER & SUMMARY METRICS
+   COMPONENTS RENDERING METHODS
 ───────────────────────────────────────── */
 function buildTicker() {
   const titles = allArticles.slice(0, 20).map(a =>
@@ -206,13 +224,10 @@ function buildStats() {
          <span class="stat-dot ${cat.toLowerCase()}"></span>
          <span class="stat-count">${n}</span> ${cat}
        </div>`
-    ).join('') + `<div class="stat-pill"><span class="stat-count">${allArticles.length}</span> live hot alerts</div>`;
+    ).join('');
   }
 }
 
-/* ─────────────────────────────────────────
-   FILTER BAR AND COMPONENT RENDERING
-───────────────────────────────────────── */
 function setFilter(cat, el) {
   activeFilter = cat;
   visibleCount = PAGE_SIZE;
@@ -222,7 +237,8 @@ function setFilter(cat, el) {
 }
 
 function getFiltered() {
-  const q = (document.getElementById('searchInput').value || '').toLowerCase();
+  const searchInput = document.getElementById('searchInput');
+  const q = (searchInput ? searchInput.value : '').toLowerCase();
   return allArticles.filter(a => {
     const catOk = activeFilter === 'ALL' || a.category === activeFilter;
     const searchOk = !q ||
@@ -241,20 +257,20 @@ function renderGrid() {
 
   let html = '';
 
-  /* Render Primary Hero Spot Feature card */
+  /* Primary Hero Card Injection */
   if (hero) {
     const imgSrc = hero.image
       ? `<img class="hero-img" src="${escHtml(hero.image)}" alt="" onerror="this.style.display='none'">`
       : '';
     html += `
       <div class="hero-section">
-        <a href="${escHtml(hero.link)}" target="_blank" rel="noopener" class="hero-card" data-cat="${escHtml(hero.category)}">
+        <div onclick="window.open('${escHtml(hero.link)}', '_blank')" class="hero-card" data-cat="${escHtml(hero.category)}">
           ${imgSrc}
           <div class="hero-overlay"></div>
           <div class="hero-content">
             <div class="hero-meta">
               <span class="card-cat-badge ${escHtml(hero.category)}">${escHtml(hero.category)}</span>
-              <span style="font-family:'Space Mono',monospace;font-size:11px;color:rgba(255,255,255,0.45)">
+              <span style="font-size:12px;color:rgba(255,255,255,0.7)">
                 ${escHtml(hero.source)} · ${relativeTime(hero.date)}
               </span>
             </div>
@@ -262,18 +278,15 @@ function renderGrid() {
             <p class="hero-desc">${escHtml(hero.desc)}</p>
             <div class="hero-footer">
               <span class="read-btn">
-                READ BREAKING ALERTS
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                  <path d="M5 12h14M12 5l7 7-7 7"/>
-                </svg>
+                READ BREAKING ALERTS →
               </span>
             </div>
           </div>
-        </a>
+        </div>
       </div>`;
   }
 
-  /* Render Secondary Timeline cards column grids */
+  /* Grid Items Injection */
   html += `<div class="grid-section">`;
   if (hero) html += `<div class="section-label">LATEST STORIES</div>`;
   html += `<div class="news-grid" id="newsGrid">`;
@@ -281,8 +294,7 @@ function renderGrid() {
   if (!filtered.length) {
     html += `
       <div class="empty-state">
-        <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="white"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <div>No breaking stories found within time envelope</div>
+        <div>No breaking stories found matching filters</div>
       </div>`;
   } else {
     rest.forEach((a, i) => {
@@ -305,13 +317,7 @@ function renderGrid() {
             </div>
             <h2 class="card-title">${escHtml(a.title)}</h2>
             <p class="card-desc">${escHtml(a.desc)}</p>
-            <span class="card-link">
-              ${escHtml(new URL(a.link).hostname.replace('www.',''))}
-              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                <polyline points="15,3 21,3 21,9"/><line x1="10" y1="14" x2="21" y2="3"/>
-              </svg>
-            </span>
+            <span class="card-link">${escHtml(new URL(a.link).hostname.replace('www.',''))}</span>
           </div>
         </a>`;
     });
@@ -319,7 +325,7 @@ function renderGrid() {
 
   html += `</div></div>`;
 
-  /* Render Infinite Scrolling pagination buttons triggers */
+  /* Pagination Wrap Trigger */
   html += `
     <div class="load-more-wrap">
       <button class="load-more-btn" id="loadMoreBtn" onclick="loadMore()" ${!hasMore ? 'disabled' : ''}>
@@ -334,15 +340,10 @@ function renderGrid() {
 function loadMore() {
   visibleCount += PAGE_SIZE;
   renderGrid();
-  const grid = document.getElementById('newsGrid');
-  if (grid) grid.children[visibleCount - PAGE_SIZE - 1]?.scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
 /* ─────────────────────────────────────────
-   BOOTSTRAP SYNC AND REGISTRATION LIFECYCLES
+   BOOTSTRAP SYNC INITIALIZATION
 ───────────────────────────────────────── */
 loadNews();
-
-// Register automated client-side fetch processing lifecycle every 30 minutes cleanly
-const THIRTY_MINUTES = 30 * 60 * 1000;
-setInterval(loadNews, THIRTY_MINUTES);
+setInterval(loadNews, 30 * 60 * 1000);
