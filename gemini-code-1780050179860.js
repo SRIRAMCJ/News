@@ -32,6 +32,23 @@ const CAT_EMOJI = { AI:'🤖', AR:'👓', VR:'🥽', Tech:'⚡' };
 const CAT_FBG   = { AI:'#1e1d30', AR:'#0d2420', VR:'#2a1020', Tech:'#241d00' };
 
 /* ─────────────────────────────────────────
+   GUARANTEED COVER IMAGE — DETERMINISTIC
+   Generates a stable picsum.photos URL
+   from the article title so the same
+   article always shows the same photo.
+───────────────────────────────────────── */
+function generateFallbackImage(title) {
+  let hash = 0;
+  const str = title || 'fallback';
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  const seed = Math.abs(hash).toString(36);
+  return `https://picsum.photos/seed/${seed}/640/360`;
+}
+
+/* ─────────────────────────────────────────
    CHRONOLOGICAL RELATIVE TIME PARSERS
 ───────────────────────────────────────── */
 function relativeTime(iso) {
@@ -60,16 +77,23 @@ function detectCategory(title, desc) {
 
 /* ─────────────────────────────────────────
    AUTOMATED IMAGE ADDRESS EXTRACTOR (CORS)
+   Now with 5-second timeout to prevent
+   slow proxy calls from blocking render.
 ───────────────────────────────────────── */
 async function fetchBackupImageViaProxy(targetUrl) {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
     const corsProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-    const res = await fetch(corsProxy);
+    const res = await fetch(corsProxy, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
     if (!res.ok) return "";
-    
+
     const json = await res.json();
     const htmlString = json.contents;
-    
+
     const titlePatterns = [
       /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
       /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
@@ -89,7 +113,7 @@ async function fetchBackupImageViaProxy(targetUrl) {
 
     const structuralMatch = htmlString.match(/<article[^>]*>[\s\S]*?<img[^>]+(?:data-src|src)=["']([^"']+)["']/i) ||
                             htmlString.match(/<img[^>]+class=["'][^"']*featured[^"']*["'][^>]+(?:data-src|src)=["']([^"']+)["']/i);
-                               
+
     if (structuralMatch && structuralMatch[1]) {
       let imgUrl = structuralMatch[1];
       if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
@@ -98,7 +122,6 @@ async function fetchBackupImageViaProxy(targetUrl) {
 
     return "";
   } catch (e) {
-    console.warn("Direct scraping fallback caught exception:", e);
     return "";
   }
 }
@@ -110,7 +133,7 @@ async function loadNews() {
   const contentTarget = document.getElementById('appContent');
   if (contentTarget && allArticles.length === 0) contentTarget.innerHTML = '<div class="spinner"></div>';
   allArticles = [];
-  
+
   const now = new Date();
   const freshnessLimit = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
@@ -119,7 +142,7 @@ async function loadNews() {
       const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(channel.url)}`;
       const response = await fetch(proxyUrl);
       if (!response.ok) return;
-      
+
       const data = await response.json();
       if (!data.items) return;
 
@@ -127,7 +150,7 @@ async function loadNews() {
         const title = (item.title || "").replace(/<[^>]+>/g, "").trim();
         const link = (item.link || "").trim();
         const desc = (item.description || "").replace(/<[^>]+>/g, "").trim();
-        
+
         if (!title || !link) continue;
 
         const textTarget = `${title} ${desc}`.toLowerCase();
@@ -137,26 +160,39 @@ async function loadNews() {
         const itemDate = item.pubDate ? new Date(item.pubDate.replace(/-/g, '/')) : new Date();
         if (itemDate < freshnessLimit) continue;
 
+        /* ── Image extraction cascade ── */
         let image = "";
+
+        // 1. RSS thumbnail field
         if (item.thumbnail) {
           image = item.thumbnail;
-        } 
+        }
+        // 2. RSS enclosure
         else if (item.enclosure && item.enclosure.link && item.enclosure.type && item.enclosure.type.startsWith('image/')) {
           image = item.enclosure.link;
         }
-        else if (item.content) {
+        // 3. <img> inside content
+        if (!image && item.content) {
           const match = item.content.match(/<img[^>]+src=["']([^"']+)["']/);
           if (match) image = match[1];
         }
-        else if (item.description) {
+        // 4. <img> inside description
+        if (!image && item.description) {
           const match = item.description.match(/<img[^>]+src=["']([^"']+)["']/);
           if (match) image = match[1];
         }
-
-        // Automated Copy-Paste Fallback from page source content image headers
+        // 5. Scrape og:image via CORS proxy (5s timeout built-in)
         if (!image && link) {
           image = await fetchBackupImageViaProxy(link);
         }
+        // 6. GUARANTEED FALLBACK — deterministic picsum.photos cover
+        if (!image) {
+          image = generateFallbackImage(title);
+        }
+
+        // Normalize protocol
+        if (image.startsWith('//')) image = 'https:' + image;
+        if (image.startsWith('http://')) image = image.replace('http://', 'https://');
 
         allArticles.push({
           id: Math.random().toString(36).substring(2, 11),
@@ -188,8 +224,8 @@ async function loadNews() {
 
   const updateLabel = document.getElementById('lastUpdated');
   if (updateLabel) {
-    updateLabel.textContent = 'Sync Complete — ' + now.toLocaleTimeString('en-US', { 
-      hour: '2-digit', minute: '2-digit' 
+    updateLabel.textContent = 'Sync Complete — ' + now.toLocaleTimeString('en-US', {
+      hour: '2-digit', minute: '2-digit'
     });
   }
 
@@ -252,15 +288,15 @@ function renderGrid() {
 
   let html = '';
 
-  /* Primary Hero Card Injection (Fixed with no-referrer setup) */
+  /* Primary Hero Card — always has an <img> with onerror safety net */
   if (hero) {
-    const imgSrc = hero.image
-      ? `<img class="hero-img" src="${escHtml(hero.image)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'">`
-      : '';
+    const fallbackUrl = escHtml(generateFallbackImage(hero.title));
     html += `
       <div class="hero-section">
         <div onclick="window.open('${escHtml(hero.link)}', '_blank')" class="hero-card" data-cat="${escHtml(hero.category)}">
-          ${imgSrc}
+          <img class="hero-img" src="${escHtml(hero.image)}" alt="" referrerpolicy="no-referrer"
+               data-fallback="${fallbackUrl}"
+               onerror="this.onerror=null;this.src=this.dataset.fallback">
           <div class="hero-overlay"></div>
           <div class="hero-content">
             <div class="hero-meta">
@@ -281,7 +317,7 @@ function renderGrid() {
       </div>`;
   }
 
-  /* Grid Items Injection (Fixed with no-referrer setup) */
+  /* Grid Items — every card now renders an <img> (no more emoji-only fallback divs) */
   html += `<div class="grid-section">`;
   if (hero) html += `<div class="section-label">LATEST STORIES</div>`;
   html += `<div class="news-grid" id="newsGrid">`;
@@ -294,10 +330,12 @@ function renderGrid() {
   } else {
     rest.forEach((a, i) => {
       const delay = `animation-delay:${Math.min(i*40,400)}ms`;
-      const img = a.image
-        ? `<img class="card-img" src="${escHtml(a.image)}" alt="" loading="lazy" referrerpolicy="no-referrer"
-               onerror="this.parentElement.innerHTML='<div class=\\'card-img-fallback\\' style=\\'background:${CAT_FBG[a.category]||'#111'}\\'>${CAT_EMOJI[a.category]||'📰'}</div>'">`
-        : `<div class="card-img-fallback" style="background:${CAT_FBG[a.category]||'#111'}">${CAT_EMOJI[a.category]||'📰'}</div>`;
+      const fallbackUrl = escHtml(generateFallbackImage(a.title));
+
+      // Every card gets a real <img> — onerror falls back to picsum
+      const img = `<img class="card-img" src="${escHtml(a.image)}" alt="" loading="lazy" referrerpolicy="no-referrer"
+             data-fallback="${fallbackUrl}"
+             onerror="this.onerror=null;this.src=this.dataset.fallback">`;
 
       html += `
         <a href="${escHtml(a.link)}" target="_blank" rel="noopener" class="news-card" data-cat="${escHtml(a.category)}" style="${delay}">
@@ -339,6 +377,7 @@ function loadMore() {
 
 /* ─────────────────────────────────────────
    BOOTSTRAP SYNC INITIALIZATION
+   — Auto-refreshes every 30 minutes
 ───────────────────────────────────────── */
 loadNews();
 setInterval(loadNews, 30 * 60 * 1000);
