@@ -57,6 +57,7 @@ let activeFilter = 'ALL';
 let visibleCount = 12;
 const PAGE_SIZE  = 12;
 
+// The 10 requested target tech channels
 const CHANNELS = [
   { url: "https://techcrunch.com/feed/", category: "Tech", label: "TechCrunch" },
   { url: "https://www.theverge.com/rss/index.xml", category: "Tech", label: "The Verge" },
@@ -109,54 +110,6 @@ function detectCategory(title, desc) {
 }
 
 /* ─────────────────────────────────────────
-   DYNAMIC SOURCE PAGE SCRAEPING OVERLAY (CORS)
-───────────────────────────────────────── */
-async function fetchBackupImageViaProxy(targetUrl) {
-  try {
-    // Routes requests over allorigins proxy to transparently extract source HTML markup inside browser clients
-    const corsProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-    const res = await fetch(corsProxy);
-    if (!res.ok) return "";
-    
-    const json = await res.json();
-    const htmlString = json.contents;
-    
-    // Scan array structures across reversed metadata alignments to locate image anchors
-    const titlePatterns = [
-      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
-      /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i
-    ];
-
-    for (let pattern of titlePatterns) {
-      const match = htmlString.match(pattern);
-      if (match && match[1]) {
-        let imgUrl = match[1];
-        if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
-        if (imgUrl.startsWith('http://')) imgUrl = imgUrl.replace('http://', 'https://');
-        return imgUrl;
-      }
-    }
-
-    // Secondary parsing structural backup layout context markers 
-    const structuralMatch = htmlString.match(/<article[^>]*>[\s\S]*?<img[^>]+(?:data-src|src)=["']([^"']+)["']/i) ||
-                            htmlString.match(/<img[^>]+class=["'][^"']*featured[^"']*["'][^>]+(?:data-src|src)=["']([^"']+)["']/i);
-                               
-    if (structuralMatch && structuralMatch[1]) {
-      let imgUrl = structuralMatch[1];
-      if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
-      return imgUrl;
-    }
-
-    return "";
-  } catch (e) {
-    console.warn("Direct scraping fallback caught exception:", e);
-    return "";
-  }
-}
-
-/* ─────────────────────────────────────────
    CLIENT SIDE SCRAPER MODULE
 ───────────────────────────────────────── */
 async function loadNews() {
@@ -165,11 +118,12 @@ async function loadNews() {
   allArticles = [];
   
   const now = new Date();
+  // Rigid 24-hour timestamp delta check to ensure absolute hot-breaking validation
   const freshnessLimit = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  // Mapped requests run inside loops so asynchronous tasks process smoothly
   const fetchPromises = CHANNELS.map(async (channel) => {
     try {
+      // Maps requests over public RSS-to-JSON engine adapters to transparently solve browser CORS blocks
       const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(channel.url)}`;
       const response = await fetch(proxyUrl);
       if (!response.ok) return;
@@ -177,19 +131,20 @@ async function loadNews() {
       const data = await response.json();
       if (!data.items) return;
 
-      for (const item of data.items) {
+      data.items.forEach(item => {
         const title = (item.title || "").replace(/<[^>]+>/g, "").trim();
         const link = (item.link || "").trim();
         const desc = (item.description || "").replace(/<[^>]+>/g, "").trim();
         
-        if (!title || !link) continue;
+        if (!title || !link) return;
 
         const textTarget = `${title} ${desc}`.toLowerCase();
         const isRelevant = ALL_KEYWORDS.some(kw => textTarget.includes(kw));
-        if (!isRelevant) continue;
+        if (!isRelevant) return;
 
+        // Clean up text dates to safely evaluate timestamp milestones inside Safari, Chrome and Firefox
         const itemDate = item.pubDate ? new Date(item.pubDate.replace(/-/g, '/')) : new Date();
-        if (itemDate < freshnessLimit) continue;
+        if (itemDate < freshnessLimit) return;
 
         // ─── OPTIMIZED IMAGE EXTRACTION FALLBACK LAYER ───
         let image = "";
@@ -197,22 +152,19 @@ async function loadNews() {
         if (item.thumbnail) {
           image = item.thumbnail;
         } 
+        // 1. Check for standard RSS image enclosures inside the API parsed JSON
         else if (item.enclosure && item.enclosure.link && item.enclosure.type && item.enclosure.type.startsWith('image/')) {
           image = item.enclosure.link;
         }
+        // 2. Scan content payload blocks if present
         else if (item.content) {
           const match = item.content.match(/<img[^>]+src=["']([^"']+)["']/);
           if (match) image = match[1];
         }
+        // 3. Look directly into unstripped description strings for early embedded img objects (e.g. The Verge style)
         else if (item.description) {
           const match = item.description.match(/<img[^>]+src=["']([^"']+)["']/);
           if (match) image = match[1];
-        }
-
-        // 🌟 AUTOMATED SOURCE PAGE PASTE FALLBACK 
-        // If image links are totally missing from feeds, copy directly from page content
-        if (!image && link) {
-          image = await fetchBackupImageViaProxy(link);
         }
 
         allArticles.push({
@@ -225,7 +177,7 @@ async function loadNews() {
           category: detectCategory(title, desc) || channel.category,
           date: itemDate.toISOString()
         });
-      }
+      });
     } catch (err) {
       console.warn(`Could not sync channel ${channel.label}:`, err);
     }
@@ -233,8 +185,10 @@ async function loadNews() {
 
   await Promise.all(fetchPromises);
 
+  // Chronological sort allocation (Newest matching entries map to upper array boundaries)
   allArticles.sort((a, b) => new Date(b.date) - new Date(a.date));
 
+  // Clear cross-network syndication duplicate blocks cleanly
   const seenTitles = new Set();
   allArticles = allArticles.filter(art => {
     const cleanTitle = art.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 42);
@@ -266,9 +220,6 @@ function buildTicker() {
   if (t) t.innerHTML = titles ? titles + titles : '<span class="ticker-item">No stories found within 24h envelope</span>';
 }
 
-/* ─────────────────────────────────────────
-   DYNAMIC RENDER FILTERS AND COMPONENT LAYOUTS
-───────────────────────────────────────── */
 function buildStats() {
   const counts = { AI: 0, AR: 0, VR: 0, Tech: 0 };
   allArticles.forEach(a => { if (counts[a.category] !== undefined) counts[a.category]++; });
@@ -281,6 +232,17 @@ function buildStats() {
        </div>`
     ).join('') + `<div class="stat-pill"><span class="stat-count">${allArticles.length}</span> live hot alerts</div>`;
   }
+}
+
+/* ─────────────────────────────────────────
+   FILTER BAR AND COMPONENT RENDERING
+───────────────────────────────────────── */
+function setFilter(cat, el) {
+  activeFilter = cat;
+  visibleCount = PAGE_SIZE;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderGrid();
 }
 
 function getFiltered() {
@@ -395,7 +357,7 @@ function loadMore() {
 ───────────────────────────────────────── */
 loadNews();
 
-// Automatically update content listings seamlessly in the background every 30 minutes
+// Register automated client-side fetch processing lifecycle every 30 minutes cleanly
 const THIRTY_MINUTES = 30 * 60 * 1000;
 setInterval(loadNews, THIRTY_MINUTES);
 </script>
