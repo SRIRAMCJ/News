@@ -1,30 +1,30 @@
 :root {
-  /* Light Theme (Default) */
-  --bg:           #f6f4ee; 
-  --surface:      #ffffff; 
-  --surface2:     #eae6db; 
-  --border:       rgba(0, 0, 0, 0.06); 
-  --text:         #0d0d0d; 
-  --muted:        #7a756b; 
-  --accent:       #c14a2f; 
-  --accent2:      #a2361e; 
-  
-  --ai:           #2b5797; 
-  --ar:           #c14a2f; 
-  --vr:           #4a6b53; 
-  --tech:         #6f42c1; 
+  /* ─── LIGHT THEME (Default) ─── */
+  --bg:           #f6f4ee;
+  --surface:      #ffffff;
+  --surface2:     #eae6db;
+  --border:       rgba(0, 0, 0, 0.06);
+  --text:         #0d0d0d;
+  --muted:        #7a756b;
+  --accent:       #c14a2f;
+  --accent2:      #a2361e;
+
+  --ai:           #2b5797;
+  --ar:           #c14a2f;
+  --vr:           #4a6b53;
+  --tech:         #6f42c1;
 
   --shadow-sm:    0 2px 8px rgba(13, 13, 13, 0.04);
   --shadow-md:    0 8px 24px rgba(13, 13, 13, 0.06);
   --shadow-lg:    0 16px 48px rgba(193, 74, 47, 0.1);
-  
+
   --header-bg:    rgba(246, 244, 238, 0.9);
   --hero-gradient: linear-gradient(to top, rgba(13,13,13,0.85) 0%, rgba(13,13,13,0.2) 100%);
   --img-filter:   brightness(0.4) sepia(0.15);
   --img-hover-filter: brightness(0.3) sepia(0.2);
 }
 
-/* ─── MIDNIGHT TERMINAL DARK MODE ─── */
+/* ─── DARK THEME ─── */
 [data-theme="dark"] {
   --bg:           #111110;
   --surface:      #1c1b19;
@@ -33,7 +33,7 @@
   --text:         #e8e2d6;
   --muted:        #9a9488;
   --accent:       #e85d42;
-  --accent2:      #c14a2f; 
+  --accent2:      #c14a2f;
 
   --ai:           #5b87c7;
   --ar:           #e85d42;
@@ -43,7 +43,7 @@
   --shadow-sm:    0 2px 8px rgba(0, 0, 0, 0.3);
   --shadow-md:    0 8px 24px rgba(0, 0, 0, 0.4);
   --shadow-lg:    0 16px 48px rgba(232, 93, 66, 0.15);
-  
+
   --header-bg:    rgba(17, 17, 16, 0.9);
   --hero-gradient: linear-gradient(to top, rgba(17,17,16,0.9) 0%, rgba(17,17,16,0.2) 100%);
   --img-filter:   brightness(0.5);
@@ -51,14 +51,13 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 html { scroll-behavior: smooth; }
 
 body {
   background: var(--bg);
   color: var(--text);
   font-family: 'Times New Roman', Times, Baskerville, Georgia, serif;
-  font-size: 16px; 
+  font-size: 16px;
   line-height: 1.6;
   min-height: 100vh;
   overflow-x: hidden;
@@ -144,16 +143,16 @@ header {
   box-shadow: var(--shadow-sm);
   padding: 0;
 }
-
 .theme-toggle:hover {
   color: var(--accent);
   border-color: var(--accent);
 }
 
-.theme-toggle .icon-sun { display: none; }
+/* Show moon in light mode, sun in dark mode */
+.theme-toggle .icon-sun  { display: none; }
 .theme-toggle .icon-moon { display: block; }
 
-[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+[data-theme="dark"] .theme-toggle .icon-sun  { display: block; }
 [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
 
 .refresh-btn {
@@ -255,7 +254,7 @@ header {
 
 .filter-tab[data-cat="ALL"].active  { background: var(--text); color: var(--bg); }
 .filter-tab[data-cat="AI"].active   { background: var(--ai); }
-.filter-tab[data-cat="AR"].active   { background: var(--accent); } 
+.filter-tab[data-cat="AR"].active   { background: var(--accent); }
 .filter-tab[data-cat="VR"].active   { background: var(--vr); }
 .filter-tab[data-cat="Tech"].active { background: var(--tech); }
 
@@ -530,22 +529,6 @@ header {
   font-family: 'Times New Roman', Times, serif;
   font-size: 14px;
 }
-
-/* ─── Error & Status Boxes ─── */
-.error-box {
-  padding: 24px;
-  border: 1px solid rgba(193, 74, 47, 0.3);
-  border-radius: 6px;
-  background: rgba(193, 74, 47, 0.05);
-  font-family: 'Times New Roman', Times, serif;
-  font-size: 14px;
-  color: var(--text);
-  max-width: 600px;
-  margin: 32px auto;
-  line-height: 1.7;
-  text-align: center;
-}
-.error-box strong { color: var(--accent); }
 
 .load-more-wrap {
   padding: 0 clamp(16px, 4vw, 64px) 64px;
