@@ -1,26 +1,4 @@
 /* ─────────────────────────────────────────
-   DARK MODE INITIALIZATION & TOGGLE
-───────────────────────────────────────── */
-function initTheme() {
-  const savedTheme = localStorage.getItem('signal-theme');
-  if (savedTheme) {
-    document.documentElement.setAttribute('data-theme', savedTheme);
-  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.documentElement.setAttribute('data-theme', 'dark');
-  }
-}
-
-function toggleTheme() {
-  let currentTheme = document.documentElement.getAttribute('data-theme');
-  let newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-  
-  document.documentElement.setAttribute('data-theme', newTheme);
-  localStorage.setItem('signal-theme', newTheme);
-}
-
-initTheme();
-
-/* ─────────────────────────────────────────
    STATE & ARRAYS MAPPING DEFINITIONS
 ───────────────────────────────────────── */
 let allArticles  = [];
@@ -52,7 +30,14 @@ const KEYWORDS = {
 const ALL_KEYWORDS = Object.values(KEYWORDS).flat();
 
 const CAT_EMOJI = { AI:'🤖', AR:'👓', VR:'🥽', Tech:'⚡' };
+const CAT_FBG   = { AI:'#1e1d30', AR:'#0d2420', VR:'#2a1020', Tech:'#241d00' };
 
+/* ─────────────────────────────────────────
+   GUARANTEED COVER IMAGE — DETERMINISTIC
+   Uses a hash of the title as the seed so
+   the same article always renders the
+   same photo. 100% coverage guaranteed.
+───────────────────────────────────────── */
 function generateFallbackImage(title) {
   let hash = 0;
   const str = title || 'fallback';
@@ -64,6 +49,9 @@ function generateFallbackImage(title) {
   return `https://picsum.photos/seed/${seed}/640/360`;
 }
 
+/* ─────────────────────────────────────────
+   UTILITY HELPERS
+───────────────────────────────────────── */
 function relativeTime(iso) {
   const parsedDate = new Date(iso);
   const secs = Math.floor((Date.now() - parsedDate) / 1000);
@@ -102,6 +90,9 @@ function showSyncStatus(msg, isError) {
 
 /* ─────────────────────────────────────────
    DUAL-SOURCE RSS FETCHER
+   Method 1: rss2json.com API
+   Method 2: Direct XML via corsproxy.io
+   Each channel is tried with both methods.
 ───────────────────────────────────────── */
 async function fetchRssViaJson2(feedUrl) {
   const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`;
@@ -136,18 +127,21 @@ async function fetchRssViaCorsProxy(feedUrl) {
     };
 
     let image = '';
+    // media:thumbnail / media:content
     const mThumbnail = entry.getElementsByTagNameNS('http://search.yahoo.com/mrss/', 'thumbnail')[0];
     if (mThumbnail && mThumbnail.getAttribute('url')) image = mThumbnail.getAttribute('url');
     if (!image) {
       const mContent = entry.getElementsByTagNameNS('http://search.yahoo.com/mrss/', 'content')[0];
       if (mContent && mContent.getAttribute('url')) image = mContent.getAttribute('url');
     }
+    // enclosures
     if (!image) {
       const enclosure = entry.querySelector('enclosure');
       if (enclosure && enclosure.getAttribute('type') && enclosure.getAttribute('type').startsWith('image/')) {
         image = enclosure.getAttribute('url');
       }
     }
+    // img inside content:encoded or description
     if (!image) {
       const contentEncoded = get('content\\:encoded') || getNS('http://purl.org/rss/1.0/modules/content/', 'encoded') || '';
       const descText = get('description') + ' ' + contentEncoded;
@@ -170,55 +164,46 @@ async function fetchRssViaCorsProxy(feedUrl) {
   return items;
 }
 
+/* ─────────────────────────────────────────
+   IMAGE EXTRACTION FROM A SINGLE ITEM
+───────────────────────────────────────── */
 function extractImageFromItem(item, title) {
   let image = '';
+
+  // 1. thumbnail
   if (item.thumbnail) image = item.thumbnail;
+  // 2. enclosure
   if (!image && item.enclosure && item.enclosure.link) {
     if (!item.enclosure.type || item.enclosure.type.startsWith('image/')) {
       image = item.enclosure.link;
     }
   }
+  // 3. <img> inside content
   if (!image && item.content) {
     const match = item.content.match(/<img[^>]+src=["']([^"']+)["']/i);
     if (match) image = match[1];
   }
+  // 4. <img> inside description
   if (!image && item.description) {
     const match = item.description.match(/<img[^>]+src=["']([^"']+)["']/i);
     if (match) image = match[1];
   }
+  // 5. GUARANTEED fallback — deterministic picsum
   if (!image) {
     image = generateFallbackImage(title);
   }
+
+  // Normalize
   if (image.startsWith('//')) image = 'https:' + image;
   if (image.startsWith('http://')) image = image.replace('http://', 'https://');
+
   return image;
 }
 
 /* ─────────────────────────────────────────
-   MOCK DATA FALLBACK
-   If APIs fail completely, inject mock data
-   so the UI renders correctly.
-───────────────────────────────────────── */
-function getMockArticles() {
-  const now = new Date();
-  return [
-    { title: "OpenAI Announces GPT-5 with Real-Time Reasoning", desc: "The next generation of large language models promises to bridge the gap between artificial intelligence and human cognition.", source: "TechCrunch", category: "AI", date: new Date(now - 3600000).toISOString(), link: "#" },
-    { title: "Apple Vision Pro 2 Leaks Reveal Lighter Design", desc: "Apple's second iteration of its spatial computing headset aims to address the weight and comfort issues of the original.", source: "The Verge", category: "AR", date: new Date(now - 7200000).toISOString(), link: "#" },
-    { title: "Meta Quest 4 Sets New Standard for VR Affordability", desc: "Meta's latest headset brings high-end mixed reality features down to a consumer-friendly price point.", source: "Wired", category: "VR", date: new Date(now - 10800000).toISOString(), link: "#" },
-    { title: "Quantum Computing Breakthrough: 1000 Qubit Processor", desc: "IBM unveils its latest quantum processor, crossing the critical threshold needed for practical quantum advantage.", source: "Ars Technica", category: "Tech", date: new Date(now - 14400000).toISOString(), link: "#" },
-    { title: "Google DeepMind Achieves AGI Benchmark in Closed Test", desc: "Internal sources report that DeepMind's newest model has passed a comprehensive general intelligence test.", source: "Engadget", category: "AI", date: new Date(now - 18000000).toISOString(), link: "#" },
-    { title: "Magic Leap 3 Enters Enterprise AR Market", desc: "Magic Leap pivots entirely to B2B, offering augmented reality solutions for medical and engineering sectors.", source: "CNET", category: "AR", date: new Date(now - 21600000).toISOString(), link: "#" },
-    { title: "PlayStation VR2 PC Adapter Announced", desc: "Sony finally allows its VR headset to connect to gaming PCs, unlocking a massive library of SteamVR titles.", source: "TechRadar", category: "VR", date: new Date(now - 25200000).toISOString(), link: "#" },
-    { title: "Neuralink Begins Human Trials for Telepathic Interface", desc: "The first human patients are able to control computer cursors using only their thoughts via the N1 implant.", source: "Gizmodo", category: "Tech", date: new Date(now - 28800000).toISOString(), link: "#" },
-  ].map((m, i) => ({
-    id: `mock-${i}`,
-    image: generateFallbackImage(m.title),
-    ...m
-  }));
-}
-
-/* ─────────────────────────────────────────
    MAIN LOAD FUNCTION
+   Staggered fetching to avoid rate limits.
+   Dual-source per channel for resilience.
 ───────────────────────────────────────── */
 async function loadNews() {
   if (isRefreshing) return;
@@ -233,6 +218,7 @@ async function loadNews() {
 
   const newArticles = [];
   const now = new Date();
+  // 48-hour window for broader coverage
   const freshnessLimit = new Date(now.getTime() - 48 * 60 * 60 * 1000);
 
   let successCount = 0;
@@ -241,6 +227,7 @@ async function loadNews() {
   for (const channel of CHANNELS) {
     let items = null;
 
+    // Method 1: rss2json
     try {
       items = await fetchRssViaJson2(channel.url);
       successCount++;
@@ -248,6 +235,7 @@ async function loadNews() {
       console.warn(`[Method 1 failed] ${channel.label}:`, e.message);
     }
 
+    // Method 2: CORS proxy + XML parse
     if (!items) {
       try {
         items = await fetchRssViaCorsProxy(channel.url);
@@ -260,6 +248,7 @@ async function loadNews() {
 
     if (!items) continue;
 
+    // Small delay between channels to respect rate limits
     await new Promise(r => setTimeout(r, 300));
 
     for (const item of items) {
@@ -269,10 +258,12 @@ async function loadNews() {
 
       if (!title || !link) continue;
 
+      // Keyword relevance check
       const textTarget = `${title} ${desc}`.toLowerCase();
       const isRelevant = ALL_KEYWORDS.some(kw => textTarget.includes(kw));
       if (!isRelevant) continue;
 
+      // Freshness check
       const itemDate = item.pubDate ? new Date(item.pubDate) : new Date();
       if (isNaN(itemDate.getTime())) continue;
       if (itemDate < freshnessLimit) continue;
@@ -292,21 +283,15 @@ async function loadNews() {
     }
   }
 
-  // If APIs fail completely, use mock data so UI isn't blank
-  if (newArticles.length === 0 && allArticles.length === 0) {
-    allArticles = getMockArticles();
-    showSyncStatus('⚠ Live feeds unavailable — showing demo data', true);
-  } else if (newArticles.length > 0) {
+  // If we got zero articles, skip replacing (keep old data)
+  if (newArticles.length > 0) {
     allArticles = newArticles;
-    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    showSyncStatus(`✓ ${allArticles.length} stories — updated ${timeStr}`, false);
-  } else {
-    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    showSyncStatus(`⚠ Feed sync failed — last checked ${timeStr}`, true);
   }
 
+  // Sort newest first
   allArticles.sort((a, b) => new Date(b.date) - new Date(a.date));
 
+  // Deduplicate by title similarity
   const seenTitles = new Set();
   allArticles = allArticles.filter(art => {
     const key = art.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 42);
@@ -315,12 +300,24 @@ async function loadNews() {
     return true;
   });
 
+  console.log(`[SIGNAL] Sync done: ${successCount} feeds OK, ${failCount} failed, ${allArticles.length} articles total`);
+
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  if (allArticles.length > 0) {
+    showSyncStatus(`✓ ${allArticles.length} stories — updated ${timeStr}`, false);
+  } else {
+    showSyncStatus(`⚠ No stories found — last checked ${timeStr}`, true);
+  }
+
   buildTicker();
   buildStats();
   renderGrid();
   isRefreshing = false;
 }
 
+/* ─────────────────────────────────────────
+   COMPONENTS RENDERING METHODS
+───────────────────────────────────────── */
 function buildTicker() {
   const titles = allArticles.slice(0, 20).map(a =>
     `<span class="ticker-item">${CAT_EMOJI[a.category]||''} ${escHtml(a.title)}</span>`
@@ -372,6 +369,7 @@ function renderGrid() {
 
   let html = '';
 
+  /* ── Hero Card ── */
   if (hero) {
     const fb = escHtml(generateFallbackImage(hero.title));
     html += `
@@ -397,6 +395,7 @@ function renderGrid() {
       </div>`;
   }
 
+  /* ── Grid Section ── */
   html += `<div class="grid-section">`;
   if (hero) html += `<div class="section-label">LATEST STORIES</div>`;
   html += `<div class="news-grid" id="newsGrid">`;
@@ -434,6 +433,7 @@ function renderGrid() {
 
   html += `</div></div>`;
 
+  /* ── Load More ── */
   html += `
     <div class="load-more-wrap">
       <button class="load-more-btn" id="loadMoreBtn" onclick="loadMore()" ${!hasMore ? 'disabled' : ''}>
@@ -451,20 +451,10 @@ function loadMore() {
 }
 
 /* ─────────────────────────────────────────
-   BOOTSTRAP, THEME TOGGLE WIRING & AUTO-REFRESH
+   BOOTSTRAP + 30-MIN AUTO-REFRESH
 ───────────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', () => {
-  // Wire up the Dark Mode toggle button now that DOM is ready
-  const toggleBtn = document.getElementById('themeToggle');
-  if (toggleBtn) {
-    toggleBtn.addEventListener('click', toggleTheme);
-  }
-  
-  // Initial load
-  loadNews();
-});
-
-// 30-min auto-refresh
+loadNews();
 setInterval(() => {
+  console.log('[SIGNAL] 30-min auto-refresh triggered');
   loadNews();
 }, 30 * 60 * 1000);
