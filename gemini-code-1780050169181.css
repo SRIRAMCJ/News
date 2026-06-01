@@ -1,24 +1,53 @@
 :root {
-  /* Colors inspired directly by the uploaded Knowledge Base UI */
-  --bg:           #f6f4ee; /* Light cream background */
-  --surface:      #ffffff; /* Clean white cards and elements */
-  --surface2:     #eae6db; /* Slightly darker cream for active tabs/hover */
-  --border:       rgba(0, 0, 0, 0.06); /* Soft dark border line */
-  --text:         #0d0d0d; /* Crisp charcoal dark main text */
-  --muted:        #7a756b; /* Muted brown-grey for descriptions and meta */
-  --accent:       #c14a2f; /* Rust / burnt orange signature accent */
-  --accent2:      #a2361e; /* Darker rust for alternate focus/states */
+  /* Light Theme (Default) */
+  --bg:           #f6f4ee; 
+  --surface:      #ffffff; 
+  --surface2:     #eae6db; 
+  --border:       rgba(0, 0, 0, 0.06); 
+  --text:         #0d0d0d; 
+  --muted:        #7a756b; 
+  --accent:       #c14a2f; 
+  --accent2:      #a2361e; 
   
-  /* Category colors optimized for a light theme layout */
   --ai:           #2b5797; 
   --ar:           #c14a2f; 
   --vr:           #4a6b53; 
   --tech:         #6f42c1; 
 
-  /* Subtler shadows replacing the dark theme glowing styles */
   --shadow-sm:    0 2px 8px rgba(13, 13, 13, 0.04);
   --shadow-md:    0 8px 24px rgba(13, 13, 13, 0.06);
   --shadow-lg:    0 16px 48px rgba(193, 74, 47, 0.1);
+  
+  --header-bg:    rgba(246, 244, 238, 0.9);
+  --hero-gradient: linear-gradient(to top, rgba(13,13,13,0.85) 0%, rgba(13,13,13,0.2) 100%);
+  --img-filter:   brightness(0.4) sepia(0.15);
+  --img-hover-filter: brightness(0.3) sepia(0.2);
+}
+
+/* ─── MIDNIGHT TERMINAL DARK MODE ─── */
+[data-theme="dark"] {
+  --bg:           #111110; /* Deep warm black */
+  --surface:      #1c1b19; /* Dark charcoal cards */
+  --surface2:     #242220; /* Slightly lighter for active tabs/hover */
+  --border:       rgba(255, 255, 255, 0.08); /* Subtle light border */
+  --text:         #e8e2d6; /* Warm off-white text */
+  --muted:        #9a9488; /* Lighter muted for readability */
+  --accent:       #e85d42; /* Brighter rust for dark backgrounds */
+  --accent2:      #c14a2f; 
+
+  --ai:           #5b87c7; /* Lighter blue */
+  --ar:           #e85d42; /* Lighter rust */
+  --vr:           #6a9b73; /* Lighter green */
+  --tech:         #9b72e1; /* Lighter purple */
+
+  --shadow-sm:    0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md:    0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg:    0 16px 48px rgba(232, 93, 66, 0.15);
+  
+  --header-bg:    rgba(17, 17, 16, 0.9);
+  --hero-gradient: linear-gradient(to top, rgba(17,17,16,0.9) 0%, rgba(17,17,16,0.2) 100%);
+  --img-filter:   brightness(0.5);
+  --img-hover-filter: brightness(0.4);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,15 +57,14 @@ html { scroll-behavior: smooth; }
 body {
   background: var(--bg);
   color: var(--text);
-  /* Globally set all standard body prose to Times New Roman */
   font-family: 'Times New Roman', Times, Baskerville, Georgia, serif;
-  font-size: 16px; /* Slightly increased for better serif legibility */
+  font-size: 16px; 
   line-height: 1.6;
   min-height: 100vh;
   overflow-x: hidden;
+  transition: background 0.4s ease, color 0.4s ease;
 }
 
-/* Subtle grain overlay adapted for light theme background */
 body::before {
   content: '';
   position: fixed; inset: 0; z-index: 0;
@@ -48,10 +76,11 @@ body::before {
 
 header {
   position: sticky; top: 0; z-index: 100;
-  background: rgba(246, 244, 238, 0.9);
+  background: var(--header-bg);
   backdrop-filter: blur(20px) saturate(180%);
   border-bottom: 1px solid var(--border);
   padding: 0 clamp(16px, 4vw, 64px);
+  transition: background 0.4s ease, border-color 0.4s ease;
 }
 
 .header-inner {
@@ -78,6 +107,7 @@ header {
   font-family: 'Times New Roman', Times, serif;
   font-size: 12px; font-weight: 700;
   color: #fff;
+  transition: background 0.3s ease;
 }
 
 .logo-text {
@@ -85,17 +115,47 @@ header {
   font-size: 20px; font-weight: 800;
   letter-spacing: 0.05em;
   color: var(--text);
+  transition: color 0.3s ease;
 }
 
 .header-meta {
-  display: flex; align-items: center; gap: 20px;
+  display: flex; align-items: center; gap: 16px;
 }
 
 .last-updated {
   font-family: 'Times New Roman', Times, serif;
   font-size: 13px;
   color: var(--muted);
+  transition: color 0.3s ease;
 }
+
+/* ─── Theme Toggle Button ─── */
+.theme-toggle {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  height: 34px;
+  width: 34px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--muted);
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow-sm);
+  padding: 0;
+}
+
+.theme-toggle:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Show sun in dark mode, moon in light mode */
+.theme-toggle .icon-sun { display: none; }
+.theme-toggle .icon-moon { display: block; }
+
+[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
 
 .refresh-btn {
   font-family: 'Times New Roman', Times, serif;
@@ -120,6 +180,7 @@ header {
   height: 36px;
   display: flex;
   align-items: center;
+  transition: background 0.4s ease, border-color 0.4s ease;
 }
 
 .ticker-label {
@@ -221,7 +282,7 @@ header {
   box-shadow: var(--shadow-sm);
 }
 .search-input::placeholder { color: var(--muted); font-style: italic; }
-.search-input:focus { border-color: var(--accent); background: #ffffff; }
+.search-input:focus { border-color: var(--accent); background: var(--surface); }
 
 .stats-bar {
   padding: 0 clamp(16px, 4vw, 64px) 16px;
@@ -267,14 +328,14 @@ header {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
   object-fit: cover;
-  filter: brightness(0.4) sepia(0.15);
+  filter: var(--img-filter);
   transition: filter 0.4s, transform 0.4s;
 }
-.hero-card:hover .hero-img { filter: brightness(0.3) sepia(0.2); transform: scale(1.01); }
+.hero-card:hover .hero-img { filter: var(--img-hover-filter); transform: scale(1.01); }
 
 .hero-overlay {
   position: absolute; inset: 0;
-  background: linear-gradient(to top, rgba(13,13,13,0.85) 0%, rgba(13,13,13,0.2) 100%);
+  background: var(--hero-gradient);
 }
 
 .hero-content {
@@ -362,7 +423,7 @@ header {
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
+  transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s, background 0.4s ease;
   animation: fadeUp 0.4s ease both;
   text-decoration: none;
   box-shadow: var(--shadow-sm);
@@ -478,7 +539,6 @@ header {
   font-family: 'Times New Roman', Times, serif;
   font-size: 14px;
 }
-.empty-state svg { opacity: 0.4; margin-bottom: 16px; }
 
 .load-more-wrap {
   padding: 0 clamp(16px, 4vw, 64px) 64px;
@@ -507,6 +567,7 @@ footer {
   border-top: 1px solid var(--border);
   background: var(--surface2);
   padding: 28px clamp(16px, 4vw, 64px);
+  transition: background 0.4s ease, border-color 0.4s ease;
 }
 
 .footer-inner {
@@ -525,9 +586,6 @@ footer {
   color: var(--muted);
 }
 
-.footer-text a { color: var(--accent); text-decoration: none; }
-.footer-text a:hover { text-decoration: underline; }
-
 .news-card[data-cat="AI"]:hover   { border-top: 2px solid var(--ai); }
 .news-card[data-cat="AR"]:hover   { border-top: 2px solid var(--accent); }
 .news-card[data-cat="VR"]:hover   { border-top: 2px solid var(--vr); }
@@ -542,19 +600,6 @@ footer {
   margin: 80px auto;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-
-.error-box {
-  padding: 32px;
-  border: 1px solid rgba(193, 74, 47, 0.3);
-  border-radius: 6px;
-  background: rgba(193, 74, 47, 0.05);
-  font-family: 'Times New Roman', Times, serif;
-  font-size: 13px;
-  color: var(--accent);
-  max-width: 600px;
-  margin: 32px auto;
-  line-height: 1.7;
-}
 
 @media (max-width: 640px) {
   .hero-card { min-height: 280px; }
