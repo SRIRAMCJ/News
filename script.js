@@ -1,23 +1,26 @@
 /* ═══════════════════════════════════════════
-   DARK MODE — runs FIRST to prevent flash
+   DARK MODE
 ═══════════════════════════════════════════ */
 function initTheme() {
-  const saved = localStorage.getItem('signal-theme');
-  if (saved) {
-    document.documentElement.setAttribute('data-theme', saved);
-  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.documentElement.setAttribute('data-theme', 'dark');
-  }
+  try {
+    const saved = localStorage.getItem('signal-theme');
+    if (saved) {
+      document.documentElement.setAttribute('data-theme', saved);
+    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  } catch(e) {}
 }
 
 function toggleTheme() {
-  const current = document.documentElement.getAttribute('data-theme');
-  const next = current === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
-  localStorage.setItem('signal-theme', next);
+  try {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('signal-theme', next);
+  } catch(e) {}
 }
 
-// Apply theme IMMEDIATELY
 initTheme();
 
 /* ═══════════════════════════════════════════
@@ -50,7 +53,6 @@ const KEYWORDS = {
   Tech: ["robotics", "quantum computing", "autonomous", "self-driving", "biotech", "nanotech", "iot", "innovation", "breakthrough", "chip", "processor", "semiconductor"]
 };
 const ALL_KEYWORDS = Object.values(KEYWORDS).flat();
-
 const CAT_EMOJI = { AI:'🤖', AR:'👓', VR:'🥽', Tech:'⚡' };
 
 /* ═══════════════════════════════════════════
@@ -67,17 +69,19 @@ function generateFallbackImage(title) {
 }
 
 function relativeTime(iso) {
-  const d = new Date(iso);
-  const s = Math.floor((Date.now() - d) / 1000);
-  if (isNaN(s)) return 'live';
-  if (s < 60)    return 'just now';
-  if (s < 3600)  return `${Math.floor(s/60)}m ago`;
-  if (s < 86400) return `${Math.floor(s/3600)}h ago`;
-  return d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+  try {
+    const d = new Date(iso);
+    const s = Math.floor((Date.now() - d) / 1000);
+    if (isNaN(s)) return 'live';
+    if (s < 60)    return 'just now';
+    if (s < 3600)  return `${Math.floor(s/60)}m ago`;
+    if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+    return d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+  } catch(e) { return ''; }
 }
 
 function escHtml(s='') {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
           .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
@@ -103,20 +107,29 @@ function showSyncStatus(msg, isError) {
 }
 
 /* ═══════════════════════════════════════════
+   BULLETPROOF FETCH (No AbortSignal)
+═══════════════════════════════════════════ */
+function fetchWithTimeout(url, timeout = 8000) {
+  return Promise.race([
+    fetch(url),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeout))
+  ]);
+}
+
+/* ═══════════════════════════════════════════
    MOCK DATA FALLBACK
-   Ensures the UI renders even if all APIs fail
 ═══════════════════════════════════════════ */
 function getMockArticles() {
   const now = Date.now();
   return [
-    { title: "OpenAI Announces GPT-5 with Real-Time Reasoning", desc: "The next generation of large language models promises to bridge the gap between artificial intelligence and human cognition, achieving near-perfect scores on graduate-level benchmarks.", source: "TechCrunch", category: "AI", date: new Date(now - 3600000).toISOString(), link: "#" },
-    { title: "Apple Vision Pro 2 Leaks Reveal Lighter Design", desc: "Apple's second iteration of its spatial computing headset aims to address the weight and comfort issues of the original, featuring a custom M4 chip.", source: "The Verge", category: "AR", date: new Date(now - 7200000).toISOString(), link: "#" },
-    { title: "Meta Quest 4 Sets New Standard for VR Affordability", desc: "Meta's latest headset brings high-end mixed reality features down to a consumer-friendly price point, threatening competitors in the process.", source: "Wired", category: "VR", date: new Date(now - 10800000).toISOString(), link: "#" },
-    { title: "Quantum Computing Breakthrough: 1000 Qubit Processor", desc: "IBM unveils its latest quantum processor, crossing the critical threshold needed for practical quantum advantage in cryptography and material science.", source: "Ars Technica", category: "Tech", date: new Date(now - 14400000).toISOString(), link: "#" },
-    { title: "Google DeepMind Achieves AGI Benchmark in Closed Test", desc: "Internal sources report that DeepMind's newest model has passed a comprehensive general intelligence test, sparking debate on evaluation metrics.", source: "Engadget", category: "AI", date: new Date(now - 18000000).toISOString(), link: "#" },
-    { title: "Magic Leap 3 Enters Enterprise AR Market", desc: "Magic Leap pivots entirely to B2B, offering augmented reality solutions specifically tailored for medical and engineering sectors.", source: "CNET", category: "AR", date: new Date(now - 21600000).toISOString(), link: "#" },
-    { title: "PlayStation VR2 PC Adapter Announced", desc: "Sony finally allows its VR headset to connect to gaming PCs, unlocking a massive library of SteamVR titles for console players.", source: "TechRadar", category: "VR", date: new Date(now - 25200000).toISOString(), link: "#" },
-    { title: "Neuralink Begins Human Trials for Telepathic Interface", desc: "The first human patients are able to control computer cursors using only their thoughts via the N1 implant, marking a milestone in biotech.", source: "Gizmodo", category: "Tech", date: new Date(now - 28800000).toISOString(), link: "#" },
+    { title: "OpenAI Announces GPT-5 with Real-Time Reasoning", desc: "The next generation of large language models promises to bridge the gap between artificial intelligence and human cognition.", source: "TechCrunch", category: "AI", date: new Date(now - 3600000).toISOString(), link: "#" },
+    { title: "Apple Vision Pro 2 Leaks Reveal Lighter Design", desc: "Apple's second iteration of its spatial computing headset aims to address the weight and comfort issues of the original.", source: "The Verge", category: "AR", date: new Date(now - 7200000).toISOString(), link: "#" },
+    { title: "Meta Quest 4 Sets New Standard for VR Affordability", desc: "Meta's latest headset brings high-end mixed reality features down to a consumer-friendly price point.", source: "Wired", category: "VR", date: new Date(now - 10800000).toISOString(), link: "#" },
+    { title: "Quantum Computing Breakthrough: 1000 Qubit Processor", desc: "IBM unveils its latest quantum processor, crossing the critical threshold needed for practical quantum advantage.", source: "Ars Technica", category: "Tech", date: new Date(now - 14400000).toISOString(), link: "#" },
+    { title: "Google DeepMind Achieves AGI Benchmark in Closed Test", desc: "Internal sources report that DeepMind's newest model has passed a comprehensive general intelligence test.", source: "Engadget", category: "AI", date: new Date(now - 18000000).toISOString(), link: "#" },
+    { title: "Magic Leap 3 Enters Enterprise AR Market", desc: "Magic Leap pivots entirely to B2B, offering augmented reality solutions for medical and engineering sectors.", source: "CNET", category: "AR", date: new Date(now - 21600000).toISOString(), link: "#" },
+    { title: "PlayStation VR2 PC Adapter Announced", desc: "Sony finally allows its VR headset to connect to gaming PCs, unlocking a massive library of SteamVR titles.", source: "TechRadar", category: "VR", date: new Date(now - 25200000).toISOString(), link: "#" },
+    { title: "Neuralink Begins Human Trials for Telepathic Interface", desc: "The first human patients are able to control computer cursors using only their thoughts via the N1 implant.", source: "Gizmodo", category: "Tech", date: new Date(now - 28800000).toISOString(), link: "#" },
   ].map((m, i) => ({
     id: `mock-${i}`,
     image: generateFallbackImage(m.title),
@@ -128,8 +141,8 @@ function getMockArticles() {
    DUAL-SOURCE RSS FETCHER
 ═══════════════════════════════════════════ */
 async function fetchRssViaJson2(feedUrl) {
-  const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`;
-  const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`)}`;
+  const res = await fetchWithTimeout(proxyUrl);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   if (data.status !== 'ok' || !data.items || !data.items.length) throw new Error('No items');
@@ -137,8 +150,8 @@ async function fetchRssViaJson2(feedUrl) {
 }
 
 async function fetchRssViaCorsProxy(feedUrl) {
-  const corsUrl = `https://corsproxy.io/?${encodeURIComponent(feedUrl)}`;
-  const res = await fetch(corsUrl, { signal: AbortSignal.timeout(10000) });
+  const corsUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(feedUrl)}`;
+  const res = await fetchWithTimeout(corsUrl);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const xmlText = await res.text();
   const doc = new DOMParser().parseFromString(xmlText, 'text/xml');
@@ -199,7 +212,7 @@ function extractImageFromItem(item, title) {
 }
 
 /* ═══════════════════════════════════════════
-   MAIN LOAD FUNCTION
+   MAIN LOAD FUNCTION (Bulletproofed)
 ═══════════════════════════════════════════ */
 async function loadNews() {
   if (isRefreshing) return;
@@ -215,59 +228,64 @@ async function loadNews() {
   const freshnessLimit = new Date(now.getTime() - 48 * 60 * 60 * 1000);
   let successCount = 0, failCount = 0;
 
-  for (const channel of CHANNELS) {
-    let items = null;
+  try {
+    for (const channel of CHANNELS) {
+      let items = null;
 
-    try { items = await fetchRssViaJson2(channel.url); successCount++; }
-    catch (e) { console.warn(`[Method 1 failed] ${channel.label}:`, e.message); }
+      try { items = await fetchRssViaJson2(channel.url); successCount++; }
+      catch (e) { console.warn(`[Method 1 failed] ${channel.label}:`, e.message); }
 
-    if (!items) {
-      try { items = await fetchRssViaCorsProxy(channel.url); successCount++; }
-      catch (e) { console.warn(`[Method 2 failed] ${channel.label}:`, e.message); failCount++; }
+      if (!items) {
+        try { items = await fetchRssViaCorsProxy(channel.url); successCount++; }
+        catch (e) { console.warn(`[Method 2 failed] ${channel.label}:`, e.message); failCount++; }
+      }
+
+      if (!items) continue;
+      await new Promise(r => setTimeout(r, 300));
+
+      for (const item of items) {
+        try {
+          const title = (item.title || '').replace(/<[^>]+>/g, '').trim();
+          const link  = (item.link || '').trim();
+          const desc  = (item.description || '').replace(/<[^>]+>/g, '').trim();
+
+          if (!title || !link) continue;
+
+          const textTarget = `${title} ${desc}`.toLowerCase();
+          if (!ALL_KEYWORDS.some(kw => textTarget.includes(kw))) continue;
+
+          const itemDate = item.pubDate ? new Date(item.pubDate) : new Date();
+          if (isNaN(itemDate.getTime()) || itemDate < freshnessLimit) continue;
+
+          newArticles.push({
+            id: Math.random().toString(36).substring(2, 11),
+            title,
+            desc: desc.length > 185 ? desc.slice(0, 185) + '…' : desc,
+            link,
+            image: extractImageFromItem(item, title),
+            source: channel.label,
+            category: detectCategory(title, desc) || channel.category,
+            date: itemDate.toISOString()
+          });
+        } catch (itemErr) {
+          console.warn("Error parsing item:", itemErr);
+        }
+      }
     }
-
-    if (!items) continue;
-    await new Promise(r => setTimeout(r, 300));
-
-    for (const item of items) {
-      const title = (item.title || '').replace(/<[^>]+>/g, '').trim();
-      const link  = (item.link || '').trim();
-      const desc  = (item.description || '').replace(/<[^>]+>/g, '').trim();
-
-      if (!title || !link) continue;
-
-      const textTarget = `${title} ${desc}`.toLowerCase();
-      if (!ALL_KEYWORDS.some(kw => textTarget.includes(kw))) continue;
-
-      const itemDate = item.pubDate ? new Date(item.pubDate) : new Date();
-      if (isNaN(itemDate.getTime()) || itemDate < freshnessLimit) continue;
-
-      newArticles.push({
-        id: Math.random().toString(36).substring(2, 11),
-        title,
-        desc: desc.length > 185 ? desc.slice(0, 185) + '…' : desc,
-        link,
-        image: extractImageFromItem(item, title),
-        source: channel.label,
-        category: detectCategory(title, desc) || channel.category,
-        date: itemDate.toISOString()
-      });
-    }
+  } catch (criticalErr) {
+    console.error("Critical fetch error:", criticalErr);
   }
 
   console.log(`[SIGNAL] Sync: ${successCount} OK, ${failCount} failed, ${newArticles.length} articles`);
 
-  // ─── CRITICAL FIX: Handle total API failure ───
   if (newArticles.length > 0) {
     allArticles = newArticles;
     const timeStr = now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
     showSyncStatus(`✓ ${allArticles.length} stories — updated ${timeStr}`, false);
   } else if (allArticles.length === 0) {
-    // APIs completely failed — load mock data so UI isn't blank
     allArticles = getMockArticles();
     showSyncStatus('⚠ Live feeds unavailable — showing demo data', true);
   } else {
-    // APIs failed but we still have old data from previous load
     const timeStr = now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
     showSyncStatus(`⚠ Feed sync failed — last checked ${timeStr}`, true);
   }
