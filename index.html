@@ -1,365 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tech News Feed</title>
-    <style>
-        /* Base Styling to ensure layout renders correctly */
-        body { background: #050508; color: #fff; font-family: system-ui, sans-serif; margin: 0; padding: 20px; }
-        .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; margin: 40px auto; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .news-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; padding: 20px 0; }
-        .news-card { background: #111; border-radius: 8px; overflow: hidden; text-decoration: none; color: inherit; display: flex; flex-direction: column; opacity: 0; animation: fadeIn 0.4s forwards; }
-        @keyframes fadeIn { to { opacity: 1; } }
-        .card-thumb { position: relative; width: 100%; height: 180px; background: #222; }
-        .card-img { width: 100%; height: 100%; object-fit: cover; }
-        .card-img-fallback { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 2rem; }
-        .card-body { padding: 15px; flex-grow: 1; display: flex; flex-direction: column; }
-        .card-title { font-size: 1.1rem; margin: 0 0 10px 0; line-height: 1.4; }
-        .card-desc { font-size: 0.9rem; color: #aaa; margin: 0 0 15px 0; line-height: 1.5; }
-        .card-metadata, .card-source-row { display: flex; justify-content: space-between; font-size: 0.8rem; color: #666; margin-bottom: 8px; }
-        .card-cat-badge { position: absolute; top: 10px; left: 10px; padding: 4px 8px; background: #000; font-size: 0.75rem; font-weight: bold; border-radius: 4px; }
-        .hero-section { margin-bottom: 30px; }
-        .hero-card { position: relative; display: block; min-height: 350px; background: #111; border-radius: 12px; overflow: hidden; text-decoration: none; color: #fff; }
-        .hero-img { position: absolute; width: 100%; height: 100%; object-fit: cover; }
-        .hero-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.95) 20%, rgba(0,0,0,0.4) 100%); }
-        .hero-content { position: relative; z-index: 2; padding: 30px; display: flex; flex-direction: column; justify-content: flex-end; min-height: 350px; box-sizing: border-box; }
-        .hero-title { font-size: 2rem; margin: 10px 0; }
-        .hero-desc { color: #ccc; max-width: 800px; margin: 0 0 15px 0; }
-        .stat-pill { display: inline-flex; align-items: center; background: #1a1a24; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; margin: 5px; }
-        .stat-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-        .stat-dot.ai { background: #8a2be2; } .stat-dot.ar { background: #00fa9a; } .stat-dot.vr { background: #ff00ff; } .stat-dot.tech { background: #ffd700; }
-        .load-more-wrap { text-align: center; margin: 30px 0; }
-        .load-more-btn { background: #fff; color: #000; border: none; padding: 12px 24px; font-weight: bold; border-radius: 6px; cursor: pointer; }
-        .load-more-btn:disabled { background: #333; color: #777; cursor: not-allowed; }
-        #tickerTrack { background: #111; padding: 10px; white-space: nowrap; overflow: hidden; margin-bottom: 20px; font-size: 0.9rem; }
-        .ticker-item { margin-right: 30px; display: inline-block; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIGNAL — AI · AR · VR · Future Tech</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="gemini-code-1780050169181.css">
+  <script src="gemini-code-1780050179860.js"></script>
 </head>
 <body>
 
-    <div id="tickerTrack">Loading breaking alerts...</div>
-    <div id="statsBar"></div>
-    <div id="lastUpdated" style="font-size: 0.8rem; color: #555; text-align: right; margin-bottom: 10px;"></div>
-    
-    <input type="hidden" id="searchInput" value="">
+  <header>
+    <div class="header-inner">
+      <a class="logo" href="#">
+        <div class="logo-mark">SIG</div>
+        <span class="logo-text">SIGNAL</span>
+      </a>
+      <div class="header-meta">
+        <span class="last-updated" id="lastUpdated">—</span>
+        <button class="refresh-btn" onclick="loadNews()">↻ REFRESH</button>
+      </div>
+    </div>
+  </header>
 
-    <div id="appContent"></div>
+  <div class="ticker-wrap">
+    <span class="ticker-label">BREAKING FEED</span>
+    <div class="ticker-track" id="tickerTrack">
+      <span class="ticker-item">Awaiting hot tech updates…</span>
+    </div>
+  </div>
 
-<script>
-/* ─────────────────────────────────────────
-   STATE & ARRAYS MAPPING DEFINITIONS
-───────────────────────────────────────── */
-let allArticles  = [];
-let filtered     = [];
-let activeFilter = 'ALL';
-let visibleCount = 12;
-const PAGE_SIZE  = 12;
+  <div class="filter-bar">
+    <div class="filter-tabs">
+      <button class="filter-tab active" data-cat="ALL" onclick="setFilter('ALL',this)">ALL</button>
+      <button class="filter-tab" data-cat="AI"   onclick="setFilter('AI',this)">🤖 AI</button>
+      <button class="filter-tab" data-cat="AR"   onclick="setFilter('AR',this)">👓 AR</button>
+      <button class="filter-tab" data-cat="VR"   onclick="setFilter('VR',this)">🥽 VR</button>
+      <button class="filter-tab" data-cat="Tech" onclick="setFilter('Tech',this)">⚡ TECH</button>
+    </div>
+    <div class="search-wrap">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="color: var(--muted);">
+        <circle cx="11" cy="11" r="8"/>
+        <path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input class="search-input" type="search" id="searchInput" placeholder="Search breaking stories…" oninput="renderGrid()">
+    </div>
+  </div>
 
-// The 10 requested target tech channels
-const CHANNELS = [
-  { url: "https://techcrunch.com/feed/", category: "Tech", label: "TechCrunch" },
-  { url: "https://www.theverge.com/rss/index.xml", category: "Tech", label: "The Verge" },
-  { url: "https://www.wired.com/feed/rss", category: "Tech", label: "Wired" },
-  { url: "https://feeds.arstechnica.com/arstechnica/technology-lab", category: "Tech", label: "Ars Technica" },
-  { url: "https://www.cnet.com/rss/news/", category: "Tech", label: "CNET" },
-  { url: "https://www.engadget.com/rss.xml", category: "Tech", label: "Engadget" },
-  { url: "https://www.techradar.com/rss", category: "Tech", label: "TechRadar" },
-  { url: "https://gizmodo.com/rss", category: "Tech", label: "Gizmodo" },
-  { url: "https://www.zdnet.com/news/rss.xml", category: "Tech", label: "ZDNET" },
-  { url: "https://www.digitaltrends.com/feed/", category: "Tech", label: "Digital Trends" }
-];
+  <div class="stats-bar" id="statsBar"></div>
 
-const KEYWORDS = {
-  AI: ["artificial intelligence", "machine learning", "deep learning", "neural", "llm", "gpt", "gemini", "claude", "openai", "chatgpt", "generative ai", "transformer"],
-  AR: ["augmented reality", "ar glasses", "mixed reality", "spatial computing", "apple vision", "xr", "smart glasses"],
-  VR: ["virtual reality", "vr headset", "meta quest", "oculus", "psvr", "immersive", "metaverse"],
-  Tech: ["robotics", "quantum computing", "autonomous", "self-driving", "biotech", "nanotech", "iot", "innovation"]
-};
-const ALL_KEYWORDS = Object.values(KEYWORDS).flat();
+  <div id="appContent">
+    <div class="spinner"></div>
+  </div>
 
-const CAT_EMOJI = { AI:'🤖', AR:'👓', VR:'🥽', Tech:'⚡' };
-const CAT_FBG   = { AI:'#1e1d30', AR:'#0d2420', VR:'#2a1020', Tech:'#241d00' };
+  <footer>
+    <div class="footer-inner">
+      <span class="footer-text">
+        SIGNAL — Serverless Front-end Engine &bull; Run fully on browser native JavaScript.
+      </span>
+      <span class="footer-text">
+        Sources: TechCrunch · The Verge · Wired · Ars Technica · CNET · Engadget · TechRadar · Gizmodo · ZDNET · Digital Trends
+      </span>
+    </div>
+  </footer>
 
-/* ─────────────────────────────────────────
-   CHRONOLOGICAL RELATIVE TIME PARSERS
-───────────────────────────────────────── */
-function relativeTime(iso) {
-  const parsedDate = new Date(iso);
-  const secs = Math.floor((Date.now() - parsedDate) / 1000);
-  if (isNaN(secs)) return 'live';
-  if (secs < 60)    return 'just now';
-  if (secs < 3600)  return `${Math.floor(secs/60)}m ago`;
-  if (secs < 86400) return `${Math.floor(secs/3600)}h ago`;
-  return parsedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function escHtml(s='') {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-          .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
-function detectCategory(title, desc) {
-  const haystack = `${title} ${desc}`.toLowerCase();
-  for (const [cat, keywords] of Object.entries(KEYWORDS)) {
-    if (cat === "Tech") continue;
-    if (keywords.some(kw => haystack.includes(kw))) return cat;
-  }
-  return "Tech";
-}
-
-/* ─────────────────────────────────────────
-   CLIENT SIDE SCRAPER MODULE
-───────────────────────────────────────── */
-async function loadNews() {
-  const contentTarget = document.getElementById('appContent');
-  if (contentTarget && allArticles.length === 0) contentTarget.innerHTML = '<div class="spinner"></div>';
-  allArticles = [];
-  
-  const now = new Date();
-  // Rigid 24-hour timestamp delta check to ensure absolute hot-breaking validation
-  const freshnessLimit = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-  const fetchPromises = CHANNELS.map(async (channel) => {
-    try {
-      // Maps requests over public RSS-to-JSON engine adapters to transparently solve browser CORS blocks
-      const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(channel.url)}`;
-      const response = await fetch(proxyUrl);
-      if (!response.ok) return;
-      
-      const data = await response.json();
-      if (!data.items) return;
-
-      data.items.forEach(item => {
-        const title = (item.title || "").replace(/<[^>]+>/g, "").trim();
-        const link = (item.link || "").trim();
-        const desc = (item.description || "").replace(/<[^>]+>/g, "").trim();
-        
-        if (!title || !link) return;
-
-        const textTarget = `${title} ${desc}`.toLowerCase();
-        const isRelevant = ALL_KEYWORDS.some(kw => textTarget.includes(kw));
-        if (!isRelevant) return;
-
-        // Clean up text dates to safely evaluate timestamp milestones inside Safari, Chrome and Firefox
-        const itemDate = item.pubDate ? new Date(item.pubDate.replace(/-/g, '/')) : new Date();
-        if (itemDate < freshnessLimit) return;
-
-        // ─── OPTIMIZED IMAGE EXTRACTION FALLBACK LAYER ───
-        let image = "";
-        
-        if (item.thumbnail) {
-          image = item.thumbnail;
-        } 
-        // 1. Check for standard RSS image enclosures inside the API parsed JSON
-        else if (item.enclosure && item.enclosure.link && item.enclosure.type && item.enclosure.type.startsWith('image/')) {
-          image = item.enclosure.link;
-        }
-        // 2. Scan content payload blocks if present
-        else if (item.content) {
-          const match = item.content.match(/<img[^>]+src=["']([^"']+)["']/);
-          if (match) image = match[1];
-        }
-        // 3. Look directly into unstripped description strings for early embedded img objects (e.g. The Verge style)
-        else if (item.description) {
-          const match = item.description.match(/<img[^>]+src=["']([^"']+)["']/);
-          if (match) image = match[1];
-        }
-
-        allArticles.push({
-          id: Math.random().toString(36).substring(2, 11),
-          title: title,
-          desc: desc.length > 185 ? desc.slice(0, 185) + "..." : desc,
-          link: link,
-          image: image,
-          source: channel.label,
-          category: detectCategory(title, desc) || channel.category,
-          date: itemDate.toISOString()
-        });
-      });
-    } catch (err) {
-      console.warn(`Could not sync channel ${channel.label}:`, err);
-    }
-  });
-
-  await Promise.all(fetchPromises);
-
-  // Chronological sort allocation (Newest matching entries map to upper array boundaries)
-  allArticles.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-  // Clear cross-network syndication duplicate blocks cleanly
-  const seenTitles = new Set();
-  allArticles = allArticles.filter(art => {
-    const cleanTitle = art.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 42);
-    if (seenTitles.has(cleanTitle)) return false;
-    seenTitles.add(cleanTitle);
-    return true;
-  });
-
-  const updateLabel = document.getElementById('lastUpdated');
-  if (updateLabel) {
-    updateLabel.textContent = 'Sync Complete ' + now.toLocaleDateString('en-US', { 
-      month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' 
-    });
-  }
-
-  buildTicker();
-  buildStats();
-  renderGrid();
-}
-
-/* ─────────────────────────────────────────
-   TICKER & SUMMARY METRICS
-───────────────────────────────────────── */
-function buildTicker() {
-  const titles = allArticles.slice(0, 20).map(a =>
-    `<span class="ticker-item">${CAT_EMOJI[a.category]||''} ${escHtml(a.title)}</span>`
-  ).join('');
-  const t = document.getElementById('tickerTrack');
-  if (t) t.innerHTML = titles ? titles + titles : '<span class="ticker-item">No stories found within 24h envelope</span>';
-}
-
-function buildStats() {
-  const counts = { AI: 0, AR: 0, VR: 0, Tech: 0 };
-  allArticles.forEach(a => { if (counts[a.category] !== undefined) counts[a.category]++; });
-  const sb = document.getElementById('statsBar');
-  if (sb) {
-    sb.innerHTML = Object.entries(counts).map(([cat, n]) =>
-      `<div class="stat-pill">
-         <span class="stat-dot ${cat.toLowerCase()}"></span>
-         <span class="stat-count">${n}</span> ${cat}
-       </div>`
-    ).join('') + `<div class="stat-pill"><span class="stat-count">${allArticles.length}</span> live hot alerts</div>`;
-  }
-}
-
-/* ─────────────────────────────────────────
-   FILTER BAR AND COMPONENT RENDERING
-───────────────────────────────────────── */
-function setFilter(cat, el) {
-  activeFilter = cat;
-  visibleCount = PAGE_SIZE;
-  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
-  renderGrid();
-}
-
-function getFiltered() {
-  const searchInput = document.getElementById('searchInput');
-  const q = (searchInput ? searchInput.value : '').toLowerCase();
-  return allArticles.filter(a => {
-    const catOk = activeFilter === 'ALL' || a.category === activeFilter;
-    const searchOk = !q ||
-      a.title.toLowerCase().includes(q) ||
-      (a.desc||'').toLowerCase().includes(q) ||
-      (a.source||'').toLowerCase().includes(q);
-    return catOk && searchOk;
-  });
-}
-
-function renderGrid() {
-  filtered = getFiltered();
-  const hero   = filtered[0] || null;
-  const rest   = filtered.slice(1, visibleCount);
-  const hasMore= filtered.length > visibleCount;
-
-  let html = '';
-
-  /* Render Primary Hero Spot Feature card */
-  if (hero) {
-    const imgSrc = hero.image
-      ? `<img class="hero-img" src="${escHtml(hero.image)}" alt="" onerror="this.style.display='none'">`
-      : '';
-    html += `
-      <div class="hero-section">
-        <a href="${escHtml(hero.link)}" target="_blank" rel="noopener" class="hero-card" data-cat="${escHtml(hero.category)}">
-          ${imgSrc}
-          <div class="hero-overlay"></div>
-          <div class="hero-content">
-            <div class="hero-meta">
-              <span class="card-cat-badge ${escHtml(hero.category)}">${escHtml(hero.category)}</span>
-              <span style="font-family:'Space Mono',monospace;font-size:11px;color:rgba(255,255,255,0.45)">
-                ${escHtml(hero.source)} · ${relativeTime(hero.date)}
-              </span>
-            </div>
-            <h1 class="hero-title">${escHtml(hero.title)}</h1>
-            <p class="hero-desc">${escHtml(hero.desc)}</p>
-            <div class="hero-footer">
-              <span class="read-btn">
-                READ BREAKING ALERTS →
-              </span>
-            </div>
-          </div>
-        </a>
-      </div>`;
-  }
-
-  /* Render Secondary Timeline cards column grids */
-  html += `<div class="grid-section">`;
-  if (hero) html += `<div class="section-label" style="font-weight:bold; margin-bottom:15px; letter-spacing:1px; color:#555;">LATEST STORIES</div>`;
-  html += `<div class="news-grid" id="newsGrid">`;
-
-  if (!filtered.length) {
-    html += `
-      <div class="empty-state" style="grid-column: 1/-1; text-align:center; padding: 40px; color:#666;">
-        <div>No breaking stories found within time envelope</div>
-      </div>`;
-  } else {
-    rest.forEach((a, i) => {
-      const delay = `animation-delay:${Math.min(i*40,400)}ms`;
-      const img = a.image
-        ? `<img class="card-img" src="${escHtml(a.image)}" alt="" loading="lazy"
-               onerror="this.parentElement.innerHTML='<div class=\\'card-img-fallback\\' style=\\'background:${CAT_FBG[a.category]||'#111'}\\'>${CAT_EMOJI[a.category]||'📰'}</div>'">`
-        : `<div class="card-img-fallback" style="background:${CAT_FBG[a.category]||'#111'}">${CAT_EMOJI[a.category]||'📰'}</div>`;
-
-      html += `
-        <a href="${escHtml(a.link)}" target="_blank" rel="noopener" class="news-card" data-cat="${escHtml(a.category)}" style="${delay}">
-          <div class="card-thumb">
-            ${img}
-            <span class="card-cat-badge ${escHtml(a.category)}">${escHtml(a.category)}</span>
-          </div>
-          <div class="card-body">
-            <div class="card-source-row">
-              <span class="card-source" style="color:#00fa9a; font-weight:bold;">${escHtml(a.source)}</span>
-              <span class="card-date">${relativeTime(a.date)}</span>
-            </div>
-            <h2 class="card-title">${escHtml(a.title)}</h2>
-            <p class="card-desc">${escHtml(a.desc)}</p>
-          </div>
-        </a>`;
-    });
-  }
-
-  html += `</div></div>`;
-
-  /* Render Infinite Scrolling pagination buttons triggers */
-  html += `
-    <div class="load-more-wrap">
-      <button class="load-more-btn" id="loadMoreBtn" onclick="loadMore()" ${!hasMore ? 'disabled' : ''}>
-        ${hasMore ? `LOAD MORE (${filtered.length - visibleCount} remaining)` : 'ALL CAUGHT UP'}
-      </button>
-    </div>`;
-
-  const viewContainer = document.getElementById('appContent');
-  if (viewContainer) viewContainer.innerHTML = html;
-}
-
-function loadMore() {
-  visibleCount += PAGE_SIZE;
-  renderGrid();
-  const grid = document.getElementById('newsGrid');
-  if (grid) grid.children[visibleCount - PAGE_SIZE - 1]?.scrollIntoView({ behavior:'smooth', block:'start' });
-}
-
-/* ─────────────────────────────────────────
-   BOOTSTRAP SYNC AND REGISTRATION LIFECYCLES
-───────────────────────────────────────── */
-loadNews();
-
-// Register automated client-side fetch processing lifecycle every 30 minutes cleanly
-const THIRTY_MINUTES = 30 * 60 * 1000;
-setInterval(loadNews, THIRTY_MINUTES);
-</script>
+  <script src="app.js"></script>
 </body>
 </html>
