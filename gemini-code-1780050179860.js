@@ -96,9 +96,24 @@ async function loadNews() {
         const itemDate = item.pubDate ? new Date(item.pubDate.replace(/-/g, '/')) : new Date();
         if (itemDate < freshnessLimit) return;
 
-        let image = item.thumbnail || "";
-        if (!image && item.content) {
+        // ─── OPTIMIZED IMAGE EXTRACTION FALLBACK LAYER ───
+        let image = "";
+        
+        if (item.thumbnail) {
+          image = item.thumbnail;
+        } 
+        // 1. Check for standard RSS image enclosures inside the API parsed JSON
+        else if (item.enclosure && item.enclosure.link && item.enclosure.type && item.enclosure.type.startsWith('image/')) {
+          image = item.enclosure.link;
+        }
+        // 2. Scan content payload blocks if present
+        else if (item.content) {
           const match = item.content.match(/<img[^>]+src=["']([^"']+)["']/);
+          if (match) image = match[1];
+        }
+        // 3. Look directly into unstripped description strings for early embedded img objects (e.g. The Verge style)
+        else if (item.description) {
+          const match = item.description.match(/<img[^>]+src=["']([^"']+)["']/);
           if (match) image = match[1];
         }
 
