@@ -80,13 +80,13 @@ function relativeTime(iso) {
   } catch(e) { return ''; }
 }
 
-function escHtml(s='') {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
           .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 function detectCategory(title, desc) {
-  const h = `${title} ${desc}`.toLowerCase();
+  const h = (title + ' ' + desc).toLowerCase();
   for (const [cat, kws] of Object.entries(KEYWORDS)) {
     if (cat === "Tech") continue;
     if (kws.some(kw => h.includes(kw))) return cat;
@@ -96,7 +96,7 @@ function detectCategory(title, desc) {
 
 function safeHostname(link) {
   try { return new URL(link).hostname.replace('www.',''); }
-  catch(e) { return link; }
+  catch(e) { return String(link); }
 }
 
 function showSyncStatus(msg, isError) {
@@ -107,12 +107,15 @@ function showSyncStatus(msg, isError) {
 }
 
 /* ═══════════════════════════════════════════
-   BULLETPROOF FETCH (No AbortSignal)
+   BULLETPROOF FETCH WITH TIMEOUT
 ═══════════════════════════════════════════ */
-function fetchWithTimeout(url, timeout = 8000) {
+function fetchWithTimeout(url, timeout) {
+  timeout = timeout || 8000;
   return Promise.race([
     fetch(url),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeout))
+    new Promise(function(_, reject) {
+      setTimeout(function() { reject(new Error('Timeout')); }, timeout);
+    })
   ]);
 }
 
@@ -120,8 +123,8 @@ function fetchWithTimeout(url, timeout = 8000) {
    MOCK DATA FALLBACK
 ═══════════════════════════════════════════ */
 function getMockArticles() {
-  const now = Date.now();
-  return [
+  var now = Date.now();
+  var mockData = [
     { title: "OpenAI Announces GPT-5 with Real-Time Reasoning", desc: "The next generation of large language models promises to bridge the gap between artificial intelligence and human cognition.", source: "TechCrunch", category: "AI", date: new Date(now - 3600000).toISOString(), link: "#" },
     { title: "Apple Vision Pro 2 Leaks Reveal Lighter Design", desc: "Apple's second iteration of its spatial computing headset aims to address the weight and comfort issues of the original.", source: "The Verge", category: "AR", date: new Date(now - 7200000).toISOString(), link: "#" },
     { title: "Meta Quest 4 Sets New Standard for VR Affordability", desc: "Meta's latest headset brings high-end mixed reality features down to a consumer-friendly price point.", source: "Wired", category: "VR", date: new Date(now - 10800000).toISOString(), link: "#" },
@@ -129,174 +132,235 @@ function getMockArticles() {
     { title: "Google DeepMind Achieves AGI Benchmark in Closed Test", desc: "Internal sources report that DeepMind's newest model has passed a comprehensive general intelligence test.", source: "Engadget", category: "AI", date: new Date(now - 18000000).toISOString(), link: "#" },
     { title: "Magic Leap 3 Enters Enterprise AR Market", desc: "Magic Leap pivots entirely to B2B, offering augmented reality solutions for medical and engineering sectors.", source: "CNET", category: "AR", date: new Date(now - 21600000).toISOString(), link: "#" },
     { title: "PlayStation VR2 PC Adapter Announced", desc: "Sony finally allows its VR headset to connect to gaming PCs, unlocking a massive library of SteamVR titles.", source: "TechRadar", category: "VR", date: new Date(now - 25200000).toISOString(), link: "#" },
-    { title: "Neuralink Begins Human Trials for Telepathic Interface", desc: "The first human patients are able to control computer cursors using only their thoughts via the N1 implant.", source: "Gizmodo", category: "Tech", date: new Date(now - 28800000).toISOString(), link: "#" },
-  ].map((m, i) => ({
-    id: `mock-${i}`,
-    image: generateFallbackImage(m.title),
-    ...m
-  }));
+    { title: "Neuralink Begins Human Trials for Telepathic Interface", desc: "The first human patients are able to control computer cursors using only their thoughts via the N1 implant.", source: "Gizmodo", category: "Tech", date: new Date(now - 28800000).toISOString(), link: "#" }
+  ];
+  var result = [];
+  for (var i = 0; i < mockData.length; i++) {
+    result.push({
+      id: 'mock-' + i,
+      title: mockData[i].title,
+      desc: mockData[i].desc,
+      source: mockData[i].source,
+      category: mockData[i].category,
+      date: mockData[i].date,
+      link: mockData[i].link,
+      image: generateFallbackImage(mockData[i].title)
+    });
+  }
+  return result;
 }
 
 /* ═══════════════════════════════════════════
-   DUAL-SOURCE RSS FETCHER
+   RSS FETCHER — Method 1: rss2json DIRECT
+   (No double-proxy — this was causing the 404)
 ═══════════════════════════════════════════ */
 async function fetchRssViaJson2(feedUrl) {
-  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`)}`;
-  const res = await fetchWithTimeout(proxyUrl);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  if (data.status !== 'ok' || !data.items || !data.items.length) throw new Error('No items');
+  var apiUrl = 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(feedUrl);
+  var res = await fetchWithTimeout(apiUrl, 8000);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  var data = await res.json();
+  if (!data || data.status !== 'ok' || !data.items || !data.items.length) throw new Error('No items');
   return data.items;
 }
 
+/* ═══════════════════════════════════════════
+   RSS FETCHER — Method 2: allorigins proxy
+   Fetches raw XML and parses client-side
+═══════════════════════════════════════════ */
 async function fetchRssViaCorsProxy(feedUrl) {
-  const corsUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(feedUrl)}`;
-  const res = await fetchWithTimeout(corsUrl);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const xmlText = await res.text();
-  const doc = new DOMParser().parseFromString(xmlText, 'text/xml');
+  var proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(feedUrl);
+  var res = await fetchWithTimeout(proxyUrl, 8000);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  var xmlText = await res.text();
+
+  if (!xmlText || xmlText.length < 50) throw new Error('Empty response');
+
+  var doc = new DOMParser().parseFromString(xmlText, 'text/xml');
   if (doc.querySelector('parsererror')) throw new Error('XML parse error');
 
-  const items = [];
-  doc.querySelectorAll('item').forEach(entry => {
-    const get = (tag) => { const el = entry.querySelector(tag); return el ? el.textContent.trim() : ''; };
-    const getNS = (ns, tag) => { const el = entry.getElementsByTagNameNS(ns, tag)[0]; return el ? el.textContent.trim() : ''; };
+  var items = [];
+  var entries = doc.querySelectorAll('item');
 
-    let image = '';
-    const mThumb = entry.getElementsByTagNameNS('http://search.yahoo.com/mrss/', 'thumbnail')[0];
+  if (!entries || entries.length === 0) throw new Error('No items parsed');
+
+  entries.forEach(function(entry) {
+    function getTag(tag) {
+      var el = entry.querySelector(tag);
+      return el ? el.textContent.trim() : '';
+    }
+    function getNS(ns, tag) {
+      var el = entry.getElementsByTagNameNS(ns, tag)[0];
+      return el ? el.textContent.trim() : '';
+    }
+
+    var image = '';
+    var mThumb = entry.getElementsByTagNameNS('http://search.yahoo.com/mrss/', 'thumbnail')[0];
     if (mThumb && mThumb.getAttribute('url')) image = mThumb.getAttribute('url');
     if (!image) {
-      const mCont = entry.getElementsByTagNameNS('http://search.yahoo.com/mrss/', 'content')[0];
+      var mCont = entry.getElementsByTagNameNS('http://search.yahoo.com/mrss/', 'content')[0];
       if (mCont && mCont.getAttribute('url')) image = mCont.getAttribute('url');
     }
     if (!image) {
-      const enc = entry.querySelector('enclosure');
-      if (enc && enc.getAttribute('type') && enc.getAttribute('type').startsWith('image/')) image = enc.getAttribute('url');
+      var enc = entry.querySelector('enclosure');
+      if (enc && enc.getAttribute('url')) image = enc.getAttribute('url');
     }
     if (!image) {
-      const ce = get('content\\:encoded') || getNS('http://purl.org/rss/1.0/modules/content/', 'encoded') || '';
-      const dt = get('description') + ' ' + ce;
-      const m = dt.match(/<img[^>]+src=["']([^"']+)["']/i);
+      var ce = getTag('content\\:encoded') || getNS('http://purl.org/rss/1.0/modules/content/', 'encoded') || '';
+      var dt = getTag('description') + ' ' + ce;
+      var m = dt.match(/<img[^>]+src=["']([^"']+)["']/i);
       if (m) image = m[1];
     }
 
     items.push({
-      title: get('title'), link: get('link'), pubDate: get('pubDate'),
-      description: get('description'), thumbnail: image, content: '',
+      title: getTag('title'),
+      link: getTag('link'),
+      pubDate: getTag('pubDate'),
+      description: getTag('description'),
+      thumbnail: image,
+      content: '',
       enclosure: image ? { link: image, type: 'image/jpeg' } : null
     });
   });
 
-  if (!items.length) throw new Error('No items parsed');
   return items;
 }
 
+/* ═══════════════════════════════════════════
+   IMAGE EXTRACTOR
+═══════════════════════════════════════════ */
 function extractImageFromItem(item, title) {
-  let image = '';
+  var image = '';
   if (item.thumbnail) image = item.thumbnail;
   if (!image && item.enclosure && item.enclosure.link) {
     if (!item.enclosure.type || item.enclosure.type.startsWith('image/')) image = item.enclosure.link;
   }
   if (!image && item.content) {
-    const m = item.content.match(/<img[^>]+src=["']([^"']+)["']/i);
+    var m = item.content.match(/<img[^>]+src=["']([^"']+)["']/i);
     if (m) image = m[1];
   }
   if (!image && item.description) {
-    const m = item.description.match(/<img[^>]+src=["']([^"']+)["']/i);
-    if (m) image = m[1];
+    var m2 = item.description.match(/<img[^>]+src=["']([^"']+)["']/i);
+    if (m2) image = m2[1];
   }
   if (!image) image = generateFallbackImage(title);
-  if (image.startsWith('//')) image = 'https:' + image;
-  if (image.startsWith('http://')) image = image.replace('http://', 'https://');
+  if (image.indexOf('//') === 0) image = 'https:' + image;
+  if (image.indexOf('http://') === 0) image = image.replace('http://', 'https://');
   return image;
 }
 
 /* ═══════════════════════════════════════════
-   MAIN LOAD FUNCTION (Bulletproofed)
+   MAIN LOAD FUNCTION
 ═══════════════════════════════════════════ */
 async function loadNews() {
   if (isRefreshing) return;
   isRefreshing = true;
 
-  const ct = document.getElementById('appContent');
-  if (ct && !allArticles.length) ct.innerHTML = '<div class="spinner"></div>';
+  var ct = document.getElementById('appContent');
+  if (ct && allArticles.length === 0) {
+    ct.innerHTML = '<div class="spinner"></div>';
+  }
 
   showSyncStatus('Syncing feeds…', false);
 
-  const newArticles = [];
-  const now = new Date();
-  const freshnessLimit = new Date(now.getTime() - 48 * 60 * 60 * 1000);
-  let successCount = 0, failCount = 0;
+  var newArticles = [];
+  var now = new Date();
+  var freshnessLimit = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+  var successCount = 0;
+  var failCount = 0;
 
-  try {
-    for (const channel of CHANNELS) {
-      let items = null;
+  for (var c = 0; c < CHANNELS.length; c++) {
+    var channel = CHANNELS[c];
+    var items = null;
 
-      try { items = await fetchRssViaJson2(channel.url); successCount++; }
-      catch (e) { console.warn(`[Method 1 failed] ${channel.label}:`, e.message); }
+    // Method 1: rss2json DIRECT (fixed — no double proxy)
+    try {
+      items = await fetchRssViaJson2(channel.url);
+      successCount++;
+    } catch (e) {
+      console.warn('[Method 1 failed] ' + channel.label + ': ' + e.message);
+    }
 
-      if (!items) {
-        try { items = await fetchRssViaCorsProxy(channel.url); successCount++; }
-        catch (e) { console.warn(`[Method 2 failed] ${channel.label}:`, e.message); failCount++; }
-      }
-
-      if (!items) continue;
-      await new Promise(r => setTimeout(r, 300));
-
-      for (const item of items) {
-        try {
-          const title = (item.title || '').replace(/<[^>]+>/g, '').trim();
-          const link  = (item.link || '').trim();
-          const desc  = (item.description || '').replace(/<[^>]+>/g, '').trim();
-
-          if (!title || !link) continue;
-
-          const textTarget = `${title} ${desc}`.toLowerCase();
-          if (!ALL_KEYWORDS.some(kw => textTarget.includes(kw))) continue;
-
-          const itemDate = item.pubDate ? new Date(item.pubDate) : new Date();
-          if (isNaN(itemDate.getTime()) || itemDate < freshnessLimit) continue;
-
-          newArticles.push({
-            id: Math.random().toString(36).substring(2, 11),
-            title,
-            desc: desc.length > 185 ? desc.slice(0, 185) + '…' : desc,
-            link,
-            image: extractImageFromItem(item, title),
-            source: channel.label,
-            category: detectCategory(title, desc) || channel.category,
-            date: itemDate.toISOString()
-          });
-        } catch (itemErr) {
-          console.warn("Error parsing item:", itemErr);
-        }
+    // Method 2: allorigins raw XML proxy
+    if (!items) {
+      try {
+        items = await fetchRssViaCorsProxy(channel.url);
+        successCount++;
+      } catch (e) {
+        console.warn('[Method 2 failed] ' + channel.label + ': ' + e.message);
+        failCount++;
       }
     }
-  } catch (criticalErr) {
-    console.error("Critical fetch error:", criticalErr);
+
+    if (!items || items.length === 0) continue;
+
+    // Small delay to respect rate limits
+    await new Promise(function(r) { setTimeout(r, 300); });
+
+    for (var j = 0; j < items.length; j++) {
+      try {
+        var item = items[j];
+        var title = (item.title || '').replace(/<[^>]+>/g, '').trim();
+        var link  = (item.link || '').trim();
+        var desc  = (item.description || '').replace(/<[^>]+>/g, '').trim();
+
+        if (!title || !link) continue;
+
+        var textTarget = (title + ' ' + desc).toLowerCase();
+        var isRelevant = false;
+        for (var k = 0; k < ALL_KEYWORDS.length; k++) {
+          if (textTarget.indexOf(ALL_KEYWORDS[k]) !== -1) {
+            isRelevant = true;
+            break;
+          }
+        }
+        if (!isRelevant) continue;
+
+        var itemDate = item.pubDate ? new Date(item.pubDate) : new Date();
+        if (isNaN(itemDate.getTime()) || itemDate < freshnessLimit) continue;
+
+        var image = extractImageFromItem(item, title);
+
+        newArticles.push({
+          id: Math.random().toString(36).substring(2, 11),
+          title: title,
+          desc: desc.length > 185 ? desc.slice(0, 185) + '…' : desc,
+          link: link,
+          image: image,
+          source: channel.label,
+          category: detectCategory(title, desc) || channel.category,
+          date: itemDate.toISOString()
+        });
+      } catch (itemErr) {
+        console.warn('Error parsing item:', itemErr);
+      }
+    }
   }
 
-  console.log(`[SIGNAL] Sync: ${successCount} OK, ${failCount} failed, ${newArticles.length} articles`);
+  console.log('[SIGNAL] Sync: ' + successCount + ' OK, ' + failCount + ' failed, ' + newArticles.length + ' articles');
 
+  // Handle results — ALWAYS render something
   if (newArticles.length > 0) {
     allArticles = newArticles;
-    const timeStr = now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
-    showSyncStatus(`✓ ${allArticles.length} stories — updated ${timeStr}`, false);
+    var timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    showSyncStatus('✓ ' + allArticles.length + ' stories — updated ' + timeStr, false);
   } else if (allArticles.length === 0) {
     allArticles = getMockArticles();
     showSyncStatus('⚠ Live feeds unavailable — showing demo data', true);
   } else {
-    const timeStr = now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
-    showSyncStatus(`⚠ Feed sync failed — last checked ${timeStr}`, true);
+    var timeStr2 = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    showSyncStatus('⚠ Feed sync failed — last checked ' + timeStr2, true);
   }
 
-  allArticles.sort((a, b) => new Date(b.date) - new Date(a.date));
+  // Sort newest first
+  allArticles.sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
 
-  const seen = new Set();
-  allArticles = allArticles.filter(a => {
-    const k = a.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 42);
-    if (seen.has(k)) return false;
-    seen.add(k); return true;
+  // Deduplicate
+  var seen = {};
+  allArticles = allArticles.filter(function(a) {
+    var k = a.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 42);
+    if (seen[k]) return false;
+    seen[k] = true;
+    return true;
   });
 
   buildTicker();
@@ -309,105 +373,103 @@ async function loadNews() {
    RENDERING
 ═══════════════════════════════════════════ */
 function buildTicker() {
-  const titles = allArticles.slice(0, 20).map(a =>
-    `<span class="ticker-item">${CAT_EMOJI[a.category]||''} ${escHtml(a.title)}</span>`
-  ).join('');
-  const t = document.getElementById('tickerTrack');
+  var titles = allArticles.slice(0, 20).map(function(a) {
+    return '<span class="ticker-item">' + (CAT_EMOJI[a.category]||'') + ' ' + escHtml(a.title) + '</span>';
+  }).join('');
+  var t = document.getElementById('tickerTrack');
   if (t) t.innerHTML = titles ? titles + titles : '<span class="ticker-item">Awaiting hot tech updates…</span>';
 }
 
 function buildStats() {
-  const counts = { AI:0, AR:0, VR:0, Tech:0 };
-  allArticles.forEach(a => { if (counts[a.category] !== undefined) counts[a.category]++; });
-  const sb = document.getElementById('statsBar');
+  var counts = { AI: 0, AR: 0, VR: 0, Tech: 0 };
+  allArticles.forEach(function(a) { if (counts[a.category] !== undefined) counts[a.category]++; });
+  var sb = document.getElementById('statsBar');
   if (sb) {
-    sb.innerHTML = Object.entries(counts).map(([cat, n]) =>
-      `<div class="stat-pill"><span class="stat-dot ${cat.toLowerCase()}"></span><span class="stat-count">${n}</span> ${cat}</div>`
-    ).join('');
+    sb.innerHTML = Object.keys(counts).map(function(cat) {
+      return '<div class="stat-pill"><span class="stat-dot ' + cat.toLowerCase() + '"></span><span class="stat-count">' + counts[cat] + '</span> ' + cat + '</div>';
+    }).join('');
   }
 }
 
 function setFilter(cat, el) {
   activeFilter = cat;
   visibleCount = PAGE_SIZE;
-  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.filter-tab').forEach(function(t) { t.classList.remove('active'); });
   el.classList.add('active');
   renderGrid();
 }
 
 function getFiltered() {
-  const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
-  return allArticles.filter(a => {
-    const catOk = activeFilter === 'ALL' || a.category === activeFilter;
-    const searchOk = !q || a.title.toLowerCase().includes(q) || (a.desc||'').toLowerCase().includes(q) || (a.source||'').toLowerCase().includes(q);
+  var searchInput = document.getElementById('searchInput');
+  var q = searchInput ? searchInput.value.toLowerCase() : '';
+  return allArticles.filter(function(a) {
+    var catOk = activeFilter === 'ALL' || a.category === activeFilter;
+    var searchOk = !q || a.title.toLowerCase().indexOf(q) !== -1 || (a.desc||'').toLowerCase().indexOf(q) !== -1 || (a.source||'').toLowerCase().indexOf(q) !== -1;
     return catOk && searchOk;
   });
 }
 
 function renderGrid() {
   filtered = getFiltered();
-  const hero = filtered[0] || null;
-  const rest = filtered.slice(1, visibleCount);
-  const hasMore = filtered.length > visibleCount;
-  let html = '';
+  var hero = filtered[0] || null;
+  var rest = filtered.slice(1, visibleCount);
+  var hasMore = filtered.length > visibleCount;
+  var html = '';
 
   if (hero) {
-    const fb = escHtml(generateFallbackImage(hero.title));
-    html += `
-      <div class="hero-section">
-        <div onclick="window.open('${escHtml(hero.link)}','_blank')" class="hero-card" data-cat="${escHtml(hero.category)}">
-          <img class="hero-img" src="${escHtml(hero.image)}" alt="" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${fb}'">
-          <div class="hero-overlay"></div>
-          <div class="hero-content">
-            <div class="hero-meta">
-              <span class="card-cat-badge ${escHtml(hero.category)}">${escHtml(hero.category)}</span>
-              <span style="font-size:12px;color:rgba(255,255,255,0.7)">${escHtml(hero.source)} · ${relativeTime(hero.date)}</span>
-            </div>
-            <h1 class="hero-title">${escHtml(hero.title)}</h1>
-            <p class="hero-desc">${escHtml(hero.desc)}</p>
-            <div class="hero-footer"><span class="read-btn">READ BREAKING ALERTS →</span></div>
-          </div>
-        </div>
-      </div>`;
+    var fb = escHtml(generateFallbackImage(hero.title));
+    html += '<div class="hero-section">' +
+      '<div onclick="window.open(\'' + escHtml(hero.link) + '\',\'_blank\')" class="hero-card" data-cat="' + escHtml(hero.category) + '">' +
+      '<img class="hero-img" src="' + escHtml(hero.image) + '" alt="" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src=\'' + fb + '\'">' +
+      '<div class="hero-overlay"></div>' +
+      '<div class="hero-content">' +
+      '<div class="hero-meta">' +
+      '<span class="card-cat-badge ' + escHtml(hero.category) + '">' + escHtml(hero.category) + '</span>' +
+      '<span style="font-size:12px;color:rgba(255,255,255,0.7)">' + escHtml(hero.source) + ' · ' + relativeTime(hero.date) + '</span>' +
+      '</div>' +
+      '<h1 class="hero-title">' + escHtml(hero.title) + '</h1>' +
+      '<p class="hero-desc">' + escHtml(hero.desc) + '</p>' +
+      '<div class="hero-footer"><span class="read-btn">READ BREAKING ALERTS →</span></div>' +
+      '</div></div></div>';
   }
 
-  html += `<div class="grid-section">`;
-  if (hero) html += `<div class="section-label">LATEST STORIES</div>`;
-  html += `<div class="news-grid" id="newsGrid">`;
+  html += '<div class="grid-section">';
+  if (hero) html += '<div class="section-label">LATEST STORIES</div>';
+  html += '<div class="news-grid" id="newsGrid">';
 
   if (!filtered.length) {
-    html += `<div class="empty-state"><div>No breaking stories found matching filters</div></div>`;
+    html += '<div class="empty-state"><div>No breaking stories found matching filters</div></div>';
   } else {
-    rest.forEach((a, i) => {
-      const delay = `animation-delay:${Math.min(i*40,400)}ms`;
-      const fb = escHtml(generateFallbackImage(a.title));
-      html += `
-        <a href="${escHtml(a.link)}" target="_blank" rel="noopener" class="news-card" data-cat="${escHtml(a.category)}" style="${delay}">
-          <div class="card-thumb">
-            <img class="card-img" src="${escHtml(a.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${fb}'">
-            <span class="card-cat-badge ${escHtml(a.category)}">${escHtml(a.category)}</span>
-          </div>
-          <div class="card-body">
-            <div class="card-source-row">
-              <span class="card-source">${escHtml(a.source)}</span>
-              <span class="card-date">${relativeTime(a.date)}</span>
-            </div>
-            <h2 class="card-title">${escHtml(a.title)}</h2>
-            <p class="card-desc">${escHtml(a.desc)}</p>
-            <span class="card-link">${escHtml(safeHostname(a.link))}</span>
-          </div>
-        </a>`;
-    });
+    for (var i = 0; i < rest.length; i++) {
+      var a = rest[i];
+      var delay = 'animation-delay:' + Math.min(i*40,400) + 'ms';
+      var fb2 = escHtml(generateFallbackImage(a.title));
+      var hostname = safeHostname(a.link);
+
+      html += '<a href="' + escHtml(a.link) + '" target="_blank" rel="noopener" class="news-card" data-cat="' + escHtml(a.category) + '" style="' + delay + '">' +
+        '<div class="card-thumb">' +
+        '<img class="card-img" src="' + escHtml(a.image) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src=\'' + fb2 + '\'">' +
+        '<span class="card-cat-badge ' + escHtml(a.category) + '">' + escHtml(a.category) + '</span>' +
+        '</div>' +
+        '<div class="card-body">' +
+        '<div class="card-source-row">' +
+        '<span class="card-source">' + escHtml(a.source) + '</span>' +
+        '<span class="card-date">' + relativeTime(a.date) + '</span>' +
+        '</div>' +
+        '<h2 class="card-title">' + escHtml(a.title) + '</h2>' +
+        '<p class="card-desc">' + escHtml(a.desc) + '</p>' +
+        '<span class="card-link">' + escHtml(hostname) + '</span>' +
+        '</div></a>';
+    }
   }
 
-  html += `</div></div>`;
-  html += `<div class="load-more-wrap">
-    <button class="load-more-btn" id="loadMoreBtn" onclick="loadMore()" ${!hasMore ? 'disabled' : ''}>
-      ${hasMore ? `LOAD MORE (${filtered.length - visibleCount} remaining)` : 'ALL CAUGHT UP'}
-    </button>
-  </div>`;
+  html += '</div></div>';
+  html += '<div class="load-more-wrap">' +
+    '<button class="load-more-btn" id="loadMoreBtn" onclick="loadMore()" ' + (!hasMore ? 'disabled' : '') + '>' +
+    (hasMore ? 'LOAD MORE (' + (filtered.length - visibleCount) + ' remaining)' : 'ALL CAUGHT UP') +
+    '</button></div>';
 
-  const el = document.getElementById('appContent');
+  var el = document.getElementById('appContent');
   if (el) el.innerHTML = html;
 }
 
@@ -420,4 +482,4 @@ function loadMore() {
    BOOTSTRAP
 ═══════════════════════════════════════════ */
 loadNews();
-setInterval(() => { loadNews(); }, 30 * 60 * 1000);
+setInterval(function() { loadNews(); }, 30 * 60 * 1000);
