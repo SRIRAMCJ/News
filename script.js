@@ -1,4 +1,22 @@
-js:
+/* ─────────────────────────────────────────
+   THEME TOGGLE FUNCTION
+───────────────────────────────────────── */
+function toggleTheme() {
+  const html = document.documentElement;
+  const currentTheme = html.getAttribute('data-theme');
+  const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', newTheme);
+  localStorage.setItem('signal-theme', newTheme);
+}
+
+// Load saved theme preference on page load
+document.addEventListener('DOMContentLoaded', function() {
+  const saved = localStorage.getItem('signal-theme');
+  if (saved) {
+    document.documentElement.setAttribute('data-theme', saved);
+  }
+});
+
 /* ─────────────────────────────────────────
    STATE & ARRAYS MAPPING DEFINITIONS
 ───────────────────────────────────────── */
@@ -7,6 +25,7 @@ let filtered     = [];
 let activeFilter = 'ALL';
 let visibleCount = 12;
 const PAGE_SIZE  = 12;
+const FETCH_TIMEOUT = 8000; // 8 second timeout per feed
 
 const CHANNELS = [
   { url: "https://techcrunch.com/feed/", category: "Tech", label: "TechCrunch" },
@@ -60,48 +79,15 @@ function detectCategory(title, desc) {
 }
 
 /* ─────────────────────────────────────────
-   AUTOMATED IMAGE ADDRESS EXTRACTOR (CORS)
+   FETCH WITH TIMEOUT
 ───────────────────────────────────────── */
-async function fetchBackupImageViaProxy(targetUrl) {
-  try {
-    const corsProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-    const res = await fetch(corsProxy);
-    if (!res.ok) return "";
-    
-    const json = await res.json();
-    const htmlString = json.contents;
-    
-    const titlePatterns = [
-      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
-      /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
-      /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i
-    ];
-
-    for (let pattern of titlePatterns) {
-      const match = htmlString.match(pattern);
-      if (match && match[1]) {
-        let imgUrl = match[1];
-        if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
-        if (imgUrl.startsWith('http://')) imgUrl = imgUrl.replace('http://', 'https://');
-        return imgUrl;
-      }
-    }
-
-    const structuralMatch = htmlString.match(/<article[^>]*>[\s\S]*?<img[^>]+(?:data-src|src)=["']([^"']+)["']/i) ||
-                            htmlString.match(/<img[^>]+class=["'][^"']*featured[^"']*["'][^>]+(?:data-src|src)=["']([^"']+)["']/i);
-                               
-    if (structuralMatch && structuralMatch[1]) {
-      let imgUrl = structuralMatch[1];
-      if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
-      return imgUrl;
-    }
-
-    return "";
-  } catch (e) {
-    console.warn("Direct scraping fallback caught exception:", e);
-    return "";
-  }
+function fetchWithTimeout(url, timeout = FETCH_TIMEOUT) {
+  return Promise.race([
+    fetch(url),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout')), timeout)
+    )
+  ]);
 }
 
 /* ─────────────────────────────────────────
@@ -118,7 +104,7 @@ async function loadNews() {
   const fetchPromises = CHANNELS.map(async (channel) => {
     try {
       const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(channel.url)}`;
-      const response = await fetch(proxyUrl);
+      const response = await fetchWithTimeout(proxyUrl);
       if (!response.ok) return;
       
       const data = await response.json();
@@ -152,11 +138,6 @@ async function loadNews() {
         else if (item.description) {
           const match = item.description.match(/<img[^>]+src=["']([^"']+)["']/);
           if (match) image = match[1];
-        }
-
-        // Automated Copy-Paste Fallback from page source content image headers
-        if (!image && link) {
-          image = await fetchBackupImageViaProxy(link);
         }
 
         allArticles.push({
@@ -253,7 +234,7 @@ function renderGrid() {
 
   let html = '';
 
-  /* Primary Hero Card Injection (Fixed with no-referrer setup) */
+  /* Primary Hero Card Injection */
   if (hero) {
     const imgSrc = hero.image
       ? `<img class="hero-img" src="${escHtml(hero.image)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'">`
@@ -282,7 +263,7 @@ function renderGrid() {
       </div>`;
   }
 
-  /* Grid Items Injection (Fixed with no-referrer setup) */
+  /* Grid Items Injection */
   html += `<div class="grid-section">`;
   if (hero) html += `<div class="section-label">LATEST STORIES</div>`;
   html += `<div class="news-grid" id="newsGrid">`;
