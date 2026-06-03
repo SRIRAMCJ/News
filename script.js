@@ -28,6 +28,7 @@ const PAGE_SIZE  = 12;
 const FETCH_TIMEOUT = 8000; // 8 second timeout per feed
 
 const CHANNELS = [
+  // ─── Major Tech Publications ───
   { url: "https://techcrunch.com/feed/", category: "Tech", label: "TechCrunch" },
   { url: "https://www.theverge.com/rss/index.xml", category: "Tech", label: "The Verge" },
   { url: "https://www.wired.com/feed/rss", category: "Tech", label: "Wired" },
@@ -37,7 +38,45 @@ const CHANNELS = [
   { url: "https://www.techradar.com/rss", category: "Tech", label: "TechRadar" },
   { url: "https://gizmodo.com/rss", category: "Tech", label: "Gizmodo" },
   { url: "https://www.zdnet.com/news/rss.xml", category: "Tech", label: "ZDNET" },
-  { url: "https://www.digitaltrends.com/feed/", category: "Tech", label: "Digital Trends" }
+  { url: "https://www.digitaltrends.com/feed/", category: "Tech", label: "Digital Trends" },
+  
+  // ─── Open Source & Developer News ───
+  { url: "https://news.ycombinator.com/rss", category: "Tech", label: "Hacker News" },
+  { url: "https://feeds.github.blog/", category: "Tech", label: "GitHub Blog" },
+  { url: "https://www.infoq.com/feed/", category: "Tech", label: "InfoQ" },
+  
+  // ─── AI & Machine Learning ───
+  { url: "https://feeds.bloomberg.com/markets/news.rss?region=US&content=technology", category: "AI", label: "Bloomberg Tech" },
+  { url: "https://feeds.cnbc.com/cnbc/financialtop_news/", category: "Tech", label: "CNBC" },
+  { url: "https://www.reddit.com/r/MachineLearning/.rss", category: "AI", label: "Reddit ML" },
+  { url: "https://www.reddit.com/r/artificial/.rss", category: "AI", label: "Reddit AI" },
+  
+  // ─── Startup & Innovation ───
+  { url: "https://feeds.producthunt.com/posts/rss", category: "Tech", label: "Product Hunt" },
+  { url: "https://www.productnewz.com/rss.xml", category: "Tech", label: "ProductNewz" },
+  
+  // ─── VR & AR Tech ───
+  { url: "https://www.reddit.com/r/virtualreality/.rss", category: "VR", label: "Reddit VR" },
+  { url: "https://www.reddit.com/r/augmentedreality/.rss", category: "AR", label: "Reddit AR" },
+  { url: "https://www.uploadvr.com/feed/", category: "VR", label: "UploadVR" },
+  
+  // ─── General Tech News ───
+  { url: "https://www.reddit.com/r/technology/.rss", category: "Tech", label: "Reddit Tech" },
+  { url: "https://feeds.arstechnica.com/arstechnica/index", category: "Tech", label: "Ars Technica Full" },
+  { url: "https://feeds.slashdot.org/Slashdot/slashdot", category: "Tech", label: "Slashdot" },
+  { url: "https://feeds.theverge.com/mobile/rss/index.xml", category: "Tech", label: "The Verge Mobile" },
+  
+  // ─── Open Source Software ───
+  { url: "https://lwn.net/headlines/rss", category: "Tech", label: "LWN.net" },
+  { url: "https://www.fsf.org/feed", category: "Tech", label: "Free Software Foundation" },
+  
+  // ─── Science & Innovation ───
+  { url: "https://feeds.arstechnica.com/arstechnica/science", category: "Tech", label: "Ars Science" },
+  { url: "https://www.reddit.com/r/science/.rss", category: "Tech", label: "Reddit Science" },
+  
+  // ─── Business & Entrepreneurship ───
+  { url: "https://www.fastcompany.com/rss.xml", category: "Tech", label: "Fast Company" },
+  { url: "https://feeds.business.com/channels/tech.xml", category: "Tech", label: "Business.com Tech" }
 ];
 
 const KEYWORDS = {
