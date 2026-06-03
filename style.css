@@ -73,6 +73,9 @@ body::before {
   background-size: 200px;
 }
 
+/* ─────────────────────────────────────────
+   HEADER & NAVIGATION
+───────────────────────────────────────── */
 header {
   position: sticky; top: 0; z-index: 100;
   background: var(--header-bg);
@@ -148,7 +151,6 @@ header {
   border-color: var(--accent);
 }
 
-/* Show moon in light mode, sun in dark mode */
 .theme-toggle .icon-sun  { display: none; }
 .theme-toggle .icon-moon { display: block; }
 
@@ -171,6 +173,9 @@ header {
 }
 .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+/* ─────────────────────────────────────────
+   TICKER
+───────────────────────────────────────── */
 .ticker-wrap {
   background: var(--surface2);
   border-bottom: 1px solid var(--border);
@@ -221,6 +226,9 @@ header {
   color: var(--accent);
 }
 
+/* ─────────────────────────────────────────
+   FILTER BAR & SEARCH
+───────────────────────────────────────── */
 .filter-bar {
   padding: 20px clamp(16px, 4vw, 64px);
   max-width: 1400px;
@@ -282,6 +290,9 @@ header {
 .search-input::placeholder { color: var(--muted); font-style: italic; }
 .search-input:focus { border-color: var(--accent); background: var(--surface); }
 
+/* ─────────────────────────────────────────
+   STATS BAR
+───────────────────────────────────────── */
 .stats-bar {
   padding: 0 clamp(16px, 4vw, 64px) 16px;
   max-width: 1400px;
@@ -303,6 +314,9 @@ header {
 .stat-dot.tech { background: var(--tech); }
 .stat-count { color: var(--text); font-weight: 700; }
 
+/* ─────────────────────────────────────────
+   HERO SECTION
+───────────────────────────────────────── */
 .hero-section {
   padding: 0 clamp(16px, 4vw, 64px) 32px;
   max-width: 1400px;
@@ -383,6 +397,9 @@ header {
 }
 .read-btn:hover { background: var(--accent2); }
 
+/* ─────────────────────────────────────────
+   GRID SECTION
+───────────────────────────────────────── */
 .grid-section {
   padding: 0 clamp(16px, 4vw, 64px) 48px;
   max-width: 1400px;
@@ -411,6 +428,9 @@ header {
   gap: 24px;
 }
 
+/* ─────────────────────────────────────────
+   NEWS CARD
+───────────────────────────────────────── */
 .news-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -530,6 +550,9 @@ header {
   font-size: 14px;
 }
 
+/* ─────────────────────────────────────────
+   LOAD MORE & FOOTER
+───────────────────────────────────────── */
 .load-more-wrap {
   padding: 0 clamp(16px, 4vw, 64px) 64px;
   max-width: 1400px;
@@ -576,6 +599,9 @@ footer {
   color: var(--muted);
 }
 
+/* ─────────────────────────────────────────
+   HOVER EFFECTS & ANIMATIONS
+───────────────────────────────────────── */
 .news-card[data-cat="AI"]:hover   { border-top: 2px solid var(--ai); }
 .news-card[data-cat="AR"]:hover   { border-top: 2px solid var(--accent); }
 .news-card[data-cat="VR"]:hover   { border-top: 2px solid var(--vr); }
@@ -591,6 +617,9 @@ footer {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ─────────────────────────────────────────
+   RESPONSIVE DESIGN
+───────────────────────────────────────── */
 @media (max-width: 640px) {
   .hero-card { min-height: 280px; }
   .news-grid  { grid-template-columns: 1fr; }
